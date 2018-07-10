@@ -56,6 +56,11 @@ public class PolyShape : VectorShape
 	/// </summary>
 	public bool continuousCurves = true;
 
+	/// <summary>
+	/// Does the last vertex connect back to the first?
+	/// </summary>
+	public bool closed = true;
+
 #if UNITY_EDITOR
 	/// <summary>
 	/// Scale of a control point handle
@@ -156,7 +161,15 @@ public class PolyShape : VectorShape
 		Vector2 prevOffset = vertices[PreviousIndex(index)].position - vertices[index].position;
 		Vector2 nextOffset = vertices[index].position - vertices[NextIndex(index)].position;
 
-		Vector2 direction = prevOffset.normalized +  nextOffset.normalized;
+		if (!closed)
+		{
+			if (index == 0)
+				prevOffset = -nextOffset;
+			if (index == (vertices.Length - 1))
+				nextOffset = -prevOffset;
+		}
+
+		Vector2 direction = prevOffset.normalized + nextOffset.normalized;
 		direction.Normalize();
 
 		vertices[index].enterCP = vertices[index].position + direction * (prevOffset.magnitude * 0.5f);
@@ -275,7 +288,7 @@ public class PolyShape : VectorShape
 				new BezierContour()
 				{
 					Segments = new BezierPathSegment[vertices.Length],
-					Closed = true
+					Closed = closed
 				}
 			},
 			PathProps = new PathProperties()
@@ -288,7 +301,7 @@ public class PolyShape : VectorShape
 			}
 		};
 
-		if (colorFill != Color.clear)
+		if (closed && (colorFill != Color.clear))
 		{
 			shape.Fill = new SolidFill()
 			{
@@ -296,7 +309,8 @@ public class PolyShape : VectorShape
 			};
 		}
 
-		for (int i = 0; i < vertices.Length; i++)
+		int edgeCount = closed ? vertices.Length : vertices.Length - 1;
+		for (int i = 0; i < edgeCount; i++)
 		{
 			shape.Contours[0].Segments[i].P0 = vertices[i].position;
 			if (vertices[i].segmentCurves)
@@ -310,6 +324,10 @@ public class PolyShape : VectorShape
 				shape.Contours[0].Segments[i].P1 = midPoint;
 				shape.Contours[0].Segments[i].P2 = midPoint;
 			}
+		}
+		if (!closed)
+		{
+			shape.Contours[0].Segments[edgeCount].P0 = vertices[edgeCount].position;
 		}
 
 		SceneNode polyNode = new SceneNode()
@@ -333,27 +351,61 @@ public class PolyShape : VectorShape
 	/// </summary>
 	protected override void AddColliderToGO(GameObject target)
 	{
-		PolygonCollider2D[] colliders = target.GetComponents<PolygonCollider2D>();
-		PolygonCollider2D collider = null;
+		PolygonCollider2D[] polyColliders = target.GetComponents<PolygonCollider2D>();
+		PolygonCollider2D polyCollider = null;
 
-		for (int i = 0; i < colliders.Length; i++)
+		for (int i = 0; i < polyColliders.Length; i++)
 		{
-			if (colliders[i].name == this.guid)
+			if (polyColliders[i].name == this.guid)
 			{
-				collider = colliders[i];
+				polyCollider = polyColliders[i];
 			}
 		}
 
-		if (collider == null)
+		EdgeCollider2D[] edgeColliders = target.GetComponents<EdgeCollider2D>();
+		EdgeCollider2D edgeCollider = null;
+
+		for (int i = 0; i < edgeColliders.Length; i++)
 		{
-			collider = collider.gameObject.AddComponent<PolygonCollider2D>();
-			collider.name = this.guid;
+			if (edgeColliders[i].name == this.guid)
+			{
+				edgeCollider = edgeColliders[i];
+				break;
+			}
+		}
+
+		if (closed)
+		{
+			if (polyCollider == null)
+			{
+				polyCollider = target.AddComponent<PolygonCollider2D>();
+				polyCollider.name = this.guid;
+			}
+
+			if (edgeCollider != null)
+			{
+				Object.Destroy(edgeCollider);
+			}
+		}
+		else
+		{
+			if (edgeCollider == null)
+			{
+				edgeCollider = target.AddComponent<EdgeCollider2D>();
+				edgeCollider.name = this.guid;
+			}
+
+			if (polyCollider != null)
+			{
+				Object.Destroy(polyCollider);
+			}
 		}
 
 		List<Vector2> pointList = new List<Vector2>();
 		float step = 1f / bezierSteps;
 
-		for (int i = 0; i < vertices.Length; i++)
+		int edgeCount = closed ? vertices.Length : vertices.Length - 1;
+		for (int i = 0; i < edgeCount; i++)
 		{
 			Vertex vert = vertices[i];
 
@@ -370,7 +422,14 @@ public class PolyShape : VectorShape
 			}
 		}
 
-		collider.points = pointList.ToArray();
+		if (closed)
+		{
+			polyCollider.points = pointList.ToArray();
+		}
+		else
+		{
+			edgeCollider.points = pointList.ToArray();
+		}
 	}
 
 	/// <summary>
@@ -429,7 +488,7 @@ public class PolyShape : VectorShape
 		{
 			Color colorPrev = Handles.color;
 			Vector3[] points = new Vector3[2];
-			float handleSize = HandleUtility.GetHandleSize(Vector3.zero) * handleScale;
+			float handleSize = handleDrawSize * handleScale;
 
 			Handles.color = controlHandleColor;
 			for (int i = 0; i < vertices.Length; i++)

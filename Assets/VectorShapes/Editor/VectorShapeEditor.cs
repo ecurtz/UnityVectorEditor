@@ -132,6 +132,8 @@ public class VectorShapeEditor : EditorWindow {
 			renderUtil.Render();
 
 			Handles.SetCamera(renderUtil.camera);
+			VectorShape.handleDrawSize = HandleUtility.GetHandleSize(Vector3.zero) * viewRect.height / viewRect.width;
+
 			if (activeShape != null)
 			{
 				activeShape.DrawEditorHandles(true);
@@ -227,6 +229,7 @@ public class VectorShapeEditor : EditorWindow {
 		testPoly.vertices[1].segmentCurves = true;
 		testPoly.colorOutline = Color.white;
 		testPoly.colorFill = Color.blue;
+		testPoly.closed = false;
 
 		testPoint.TranslateBy(new Vector2(0, 1));
 		testCircle1.RotateAround(new Vector2(1, 2), 180);
