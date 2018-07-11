@@ -118,6 +118,52 @@ public class CircleShape : VectorShape
 	protected override void GenerateMesh()
 	{
 		var circle = VectorUtils.MakeCircle(position, radius);
+		// Draw the circle using 4 Bezier curves
+		/*
+		var circle = new Shape()
+		{
+			Contours = new BezierContour[]
+			{
+				new BezierContour()
+				{
+					Segments = new BezierPathSegment[5],
+					Closed = true
+				}
+			}
+		};
+
+		circle.Contours[0].Segments[0].P0.x = position.x;
+		circle.Contours[0].Segments[0].P0.y = position.y + radius;
+		circle.Contours[0].Segments[0].P1.x = position.x + radius * bezierCircleConst;
+		circle.Contours[0].Segments[0].P1.y = position.y + radius;
+		circle.Contours[0].Segments[0].P2.x = position.x + radius;
+		circle.Contours[0].Segments[0].P2.y = position.y + radius * bezierCircleConst;
+
+		circle.Contours[0].Segments[1].P0.x = position.x + radius;
+		circle.Contours[0].Segments[1].P0.y = position.y;
+		circle.Contours[0].Segments[1].P1.x = position.x + radius;
+		circle.Contours[0].Segments[1].P1.y = position.y - radius * bezierCircleConst;
+		circle.Contours[0].Segments[1].P2.x = position.x + radius * bezierCircleConst;
+		circle.Contours[0].Segments[1].P2.y = position.y - radius;
+
+		circle.Contours[0].Segments[2].P0.x = position.x;
+		circle.Contours[0].Segments[2].P0.y = position.y - radius;
+		circle.Contours[0].Segments[2].P1.x = position.x - radius * bezierCircleConst;
+		circle.Contours[0].Segments[2].P1.y = position.y - radius;
+		circle.Contours[0].Segments[2].P2.x = position.x - radius;
+		circle.Contours[0].Segments[2].P2.y = position.y - radius * bezierCircleConst;
+
+		circle.Contours[0].Segments[3].P0.x = position.x - radius;
+		circle.Contours[0].Segments[3].P0.y = position.y;
+		circle.Contours[0].Segments[3].P1.x = position.x - radius;
+		circle.Contours[0].Segments[3].P1.y = position.y + radius * bezierCircleConst;
+		circle.Contours[0].Segments[3].P2.x = position.x - radius * bezierCircleConst;
+		circle.Contours[0].Segments[3].P2.y = position.y + radius;
+
+		circle.Contours[0].Segments[4].P0.x = circle.Contours[0].Segments[0].P0.x;
+		circle.Contours[0].Segments[4].P0.y = circle.Contours[0].Segments[0].P0.y;
+		*/
+
 		circle.PathProps = new PathProperties()
 		{
 			Stroke = new Stroke()

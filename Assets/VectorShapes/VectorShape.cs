@@ -35,6 +35,11 @@ public abstract class VectorShape
 	/// Shared texture for drawing AA lines in the editor.
 	/// </summary>
 	protected static Texture2D handleDrawTexture;
+
+	/// <summary>
+	/// Scale for drawing handles in the editor.
+	/// </summary>
+	public static float handleDrawSize = 0f;
 #endif
 
 	/// <summary>
@@ -182,6 +187,18 @@ public abstract class VectorShape
 	/// Number of steps when approximating Bezier curves.
 	/// </summary>
 	public static int bezierSteps = 12;
+
+#if UNITY_EDITOR
+	/// <summary>
+	/// Color of a vertex handle
+	/// </summary>
+	public static Color vertexHandleColor = Color.red;
+
+	/// <summary>
+	/// Color of a control handle
+	/// </summary>
+	public static Color controlHandleColor = Color.red;
+#endif
 
 	/// <summary>
 	/// Distance between a point and a Bezier curve

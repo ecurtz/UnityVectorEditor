@@ -9,10 +9,6 @@ public class VectorShapeEditor : EditorWindow {
 	private PreviewRenderUtility renderUtil = null;
 	private Material renderMaterial = null;
 
-	//protected static Texture2D panImage = null;
-	//protected static Texture2D zoomImage = null;
-	//protected static Texture2D moveImage = null;
-
 	private static Rect RectUnion(Rect rectA, Rect rectB)
 	{
 		return Rect.MinMaxRect(Mathf.Min(rectA.xMin, rectB.xMin),
@@ -20,6 +16,14 @@ public class VectorShapeEditor : EditorWindow {
 		                       Mathf.Max(rectA.xMax, rectB.xMax),
 		                       Mathf.Max(rectA.yMax, rectB.yMax));
 	}
+
+	// For some reason EventCommandNames is internal
+	protected const string Cmd_Delete = "Delete";
+	protected const string Cmd_SelectAll = "SelectAll";
+
+	//protected static Texture2D panImage = null;
+	//protected static Texture2D zoomImage = null;
+	//protected static Texture2D moveImage = null;
 
 	protected List<VectorShape> shapes = new List<VectorShape>();
 	public List<VectorShape> Shapes
@@ -36,6 +40,7 @@ public class VectorShapeEditor : EditorWindow {
 
 			renderUtil.camera.transform.position = new Vector3(bounds.center.x, bounds.center.y, -1);
 			renderUtil.camera.orthographicSize = bounds.height * 0.6f;
+			Repaint();
 		}
 		get
 		{
@@ -43,18 +48,22 @@ public class VectorShapeEditor : EditorWindow {
 		}
 	}
 
-	protected VectorShape activeShape;
-	public VectorShape ActiveShape
+	protected List<VectorShape> selection = new List<VectorShape>();
+	public List<VectorShape> Selection
 	{
 		set
 		{
-			activeShape = value;
+			selection = value;
+
+			Repaint();
 		}
 		get
 		{
-			return activeShape;
+			return selection;
 		}
 	}
+
+	public Color backgroundColor = Color.gray;
 
 	public void OnEnable()
 	{
@@ -67,6 +76,7 @@ public class VectorShapeEditor : EditorWindow {
 		renderUtil = new PreviewRenderUtility();
 		renderUtil.camera.orthographic = true;
 		renderUtil.camera.orthographicSize = 1f;
+		renderUtil.camera.clearFlags = CameraClearFlags.SolidColor;
 		renderUtil.camera.nearClipPlane = 0.1f;
 		renderUtil.camera.farClipPlane = 100.0f;
 		renderUtil.camera.transform.position = new Vector3(0, 0, -1);
@@ -113,6 +123,7 @@ public class VectorShapeEditor : EditorWindow {
 		}
 		EditorGUIUtility.AddCursorRect(viewRect, activeCursor);
 
+		bool handled = false;
 		if (guiEvent.type == EventType.Repaint)
 		{
 			//GUILayout.BeginArea(toolRect);
@@ -123,7 +134,7 @@ public class VectorShapeEditor : EditorWindow {
 
 			renderUtil.BeginPreview(viewRect, GUIStyle.none);
 			// renderUtil.camera.backgroundColor is reset in BeginPreview()
-			//renderUtil.camera.backgroundColor = Color.yellow;
+			renderUtil.camera.backgroundColor = backgroundColor;
 
 			foreach (VectorShape shape in shapes)
 			{
@@ -134,9 +145,9 @@ public class VectorShapeEditor : EditorWindow {
 			Handles.SetCamera(renderUtil.camera);
 			VectorShape.handleDrawSize = HandleUtility.GetHandleSize(Vector3.zero) * viewRect.height / viewRect.width;
 
-			if (activeShape != null)
+			foreach (VectorShape selected in selection)
 			{
-				activeShape.DrawEditorHandles(true);
+				selected.DrawEditorHandles(true);
 			}
 
 			renderUtil.EndAndDrawPreview(viewRect);
@@ -146,13 +157,12 @@ public class VectorShapeEditor : EditorWindow {
 			float zoomFactor = HandleUtility.niceMouseDeltaZoom;
 			renderUtil.camera.orthographicSize *= (1 - zoomFactor * .02f);
 
-			guiEvent.Use();
+			handled = true;
 		}
 		else if (guiEvent.isMouse)
 		{
 			Camera camera = renderUtil.camera;
 			float viewScale = camera.orthographicSize * 2f / viewRect.height;
-			bool handled = false;
 
 			if (activeTool == ViewTool.Pan)
 			{
@@ -182,23 +192,64 @@ public class VectorShapeEditor : EditorWindow {
 				);
 				guiEvent.delta = guiEvent.delta * new Vector2(viewScale, -viewScale);
 
-				if (activeShape != null)
+				foreach (VectorShape selected in selection)
 				{
-					handled = activeShape.HandleEditorEvent(guiEvent, true);
+					handled |= selected.HandleEditorEvent(guiEvent, true);
 				}
 
 				guiEvent.mousePosition = mousePosition;
 				guiEvent.delta = delta;
 			}
-
-			if (handled)
+		}
+		else if (guiEvent.type == EventType.ValidateCommand)
+		{
+			switch (guiEvent.commandName)
 			{
-				guiEvent.Use();
+				case Cmd_Delete:
+					if (selection.Count > 0)
+					{
+						Debug.Log("ValidateCommand Delete");
+						handled = true;
+					}
+					break;
+				case Cmd_SelectAll:
+					if (shapes.Count > 0)
+					{
+						Debug.Log("ValidateCommand SelectAll");
+						handled = true;
+					}
+					break;
 			}
+		}
+		else if (guiEvent.type == EventType.ExecuteCommand)
+		{
+			switch (guiEvent.commandName)
+			{
+				case Cmd_Delete:
+					foreach (VectorShape selected in selection)
+					{
+						shapes.Remove(selected);
+					}
+					selection.Clear();
+					handled = true;
+					break;
+				case Cmd_SelectAll:
+					foreach (VectorShape selected in shapes)
+					{
+						selection.Add(selected);
+					}
+					handled = true;
+					break;
+			}
+		}
+
+		if (handled)
+		{
+			guiEvent.Use();
 		}
 	}
 
-	void Update()
+	public void Update()
 	{
 		// HACK this is the ONLY way to actually get new GUI events
 		// to determine if the modifier keys are down.
@@ -215,28 +266,41 @@ public class VectorShapeEditor : EditorWindow {
 		VectorShapeEditor testWindow = EditorWindow.GetWindow(typeof(VectorShapeEditor)) as VectorShapeEditor;
 		testWindow.titleContent.text = "Testing...";
 
-		CircleShape testCircle1 = new CircleShape(new Vector2(0, 2), 1f);
-		testCircle1.colorOutline = Color.red;
-		CircleShape testCircle2 = new CircleShape(new Vector2(2, 0), 1f);
-		testCircle2.colorOutline = Color.green;
-		testCircle2.colorFill = Color.yellow;
+		PointShape testPoint = new PointShape(-2, 0);
+		testPoint.colorOutline = Color.black;
 
-		PointShape testPoint = new PointShape(0, 0);
-		testPoint.colorOutline = Color.cyan;
+		PolyShape testLine = new PolyShape(new Vector2(-1, 0), 0.4f, 4);
+		testLine.colorOutline = Color.black;
+		for (int i = 0; i < testLine.vertices.Length; i++)
+		{
+			testLine.vertices[i].segmentCurves = true;
+		}
+		testLine.closed = false;
 
-		PolyShape testPoly = new PolyShape(new Vector2(0, -1.5f), 2, 5);
-		testPoly.vertices[0].segmentCurves = true;
-		testPoly.vertices[1].segmentCurves = true;
-		testPoly.colorOutline = Color.white;
-		testPoly.colorFill = Color.blue;
-		testPoly.closed = false;
+		CircleShape testCircle = new CircleShape(new Vector2(0, 0), 0.4f);
+		testCircle.colorOutline = Color.black;
 
-		testPoint.TranslateBy(new Vector2(0, 1));
-		testCircle1.RotateAround(new Vector2(1, 2), 180);
-		testCircle2.TransformBy(Unity.VectorGraphics.Matrix2D.Scale(new Vector2(.5f, .5f)));
-		testPoly.TransformBy(Unity.VectorGraphics.Matrix2D.Scale(new Vector2(-1f, 1f)));
+		PolyShape testPoly3 = new PolyShape(new Vector2(1, 2), 0.4f, 3);
+		testPoly3.colorOutline = Color.black;
+		PolyShape testPoly4 = new PolyShape(new Vector2(1, 1), 0.4f, 4);
+		testPoly4.colorOutline = Color.black;
+		testPoly4.RotateAround(new Vector2(1, 1), 45);
+		PolyShape testPoly5 = new PolyShape(new Vector2(1, 0), 0.4f, 5);
+		testPoly5.colorOutline = Color.black;
+		PolyShape testPoly6 = new PolyShape(new Vector2(1, -1), 0.4f, 6);
+		testPoly6.colorOutline = Color.black;
+		testPoly6.RotateAround(new Vector2(1, -1), 30);
 
-		testWindow.Shapes = new List<VectorShape>() { testCircle1, testCircle2, testPoint, testPoly };
-		testWindow.ActiveShape = testPoly;
+		PolyShape testShape = new PolyShape(new Vector2(2, 0), 0.4f, 4);
+		testShape.colorOutline = Color.black;
+		for (int i = 0; i < testShape.vertices.Length; i++)
+		{
+			testShape.vertices[i].segmentCurves = true;
+		}
+
+		testWindow.backgroundColor = Color.white;
+		testWindow.Shapes = new List<VectorShape>() { testPoint, testLine, testCircle, testPoly3, testPoly4, testPoly5, testPoly6, testShape };
+		testWindow.Selection = new List<VectorShape>() { testLine, testShape, testPoly5 };
+		testWindow.Focus();
 	}
 }

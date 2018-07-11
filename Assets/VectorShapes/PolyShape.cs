@@ -68,16 +68,6 @@ public class PolyShape : VectorShape
 	public static float handleScale = 0.1f;
 
 	/// <summary>
-	/// Color of a vertex handle
-	/// </summary>
-	public static Color vertexHandleColor = Color.red;
-
-	/// <summary>
-	/// Color of a vertex handle
-	/// </summary>
-	public static Color controlHandleColor = Color.white;
-
-	/// <summary>
 	/// Index of active vertex
 	/// </summary>
 	public int activeIndex = -1;
@@ -130,6 +120,11 @@ public class PolyShape : VectorShape
 		for (int i = 0; i < vertexCount; i++)
 		{
 			InitializeControlPoints(i);
+		}
+
+		if (points[0] != points[points.Length - 1])
+		{
+			closed = false;
 		}
 	}
 
@@ -281,13 +276,14 @@ public class PolyShape : VectorShape
 	/// </summary>
 	protected override void GenerateMesh()
 	{
+		int segmentCount = closed ? vertices.Length + 1: vertices.Length;
 		Shape shape = new Shape()
 		{
 			Contours = new BezierContour[]
 			{
 				new BezierContour()
 				{
-					Segments = new BezierPathSegment[vertices.Length],
+					Segments = new BezierPathSegment[segmentCount],
 					Closed = closed
 				}
 			},
@@ -309,8 +305,8 @@ public class PolyShape : VectorShape
 			};
 		}
 
-		int edgeCount = closed ? vertices.Length : vertices.Length - 1;
-		for (int i = 0; i < edgeCount; i++)
+		int vertexCount = segmentCount - 1;
+		for (int i = 0; i < vertexCount; i++)
 		{
 			shape.Contours[0].Segments[i].P0 = vertices[i].position;
 			if (vertices[i].segmentCurves)
@@ -325,9 +321,14 @@ public class PolyShape : VectorShape
 				shape.Contours[0].Segments[i].P2 = midPoint;
 			}
 		}
-		if (!closed)
+
+		if (closed)
 		{
-			shape.Contours[0].Segments[edgeCount].P0 = vertices[edgeCount].position;
+			shape.Contours[0].Segments[vertexCount].P0 = vertices[0].position;
+		}
+		else
+		{
+			shape.Contours[0].Segments[vertexCount].P0 = vertices[vertexCount].position;
 		}
 
 		SceneNode polyNode = new SceneNode()
