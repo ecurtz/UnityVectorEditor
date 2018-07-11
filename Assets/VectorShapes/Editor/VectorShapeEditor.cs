@@ -20,6 +20,7 @@ public class VectorShapeEditor : EditorWindow {
 	// For some reason EventCommandNames is internal
 	protected const string Cmd_Delete = "Delete";
 	protected const string Cmd_SelectAll = "SelectAll";
+	protected const string Cmd_ModifierKeysChanged = "ModifierKeysChanged";
 
 	//protected static Texture2D panImage = null;
 	//protected static Texture2D zoomImage = null;
@@ -70,6 +71,7 @@ public class VectorShapeEditor : EditorWindow {
 		//if (panImage == null) panImage = EditorGUIUtility.FindTexture("ViewToolMove");
 		//if (zoomImage == null) zoomImage = EditorGUIUtility.FindTexture("ViewToolZoom");
 		//if (moveImage == null) moveImage = EditorGUIUtility.FindTexture("MoveTool");
+		EditorApplication.modifierKeysChanged += OnModifierKeys;
 
 		renderMaterial = new Material(Shader.Find("Unlit/Vector"));
 
@@ -80,6 +82,11 @@ public class VectorShapeEditor : EditorWindow {
 		renderUtil.camera.nearClipPlane = 0.1f;
 		renderUtil.camera.farClipPlane = 100.0f;
 		renderUtil.camera.transform.position = new Vector3(0, 0, -1);
+	}
+
+	public void OnModifierKeys()
+	{
+		SendEvent(EditorGUIUtility.CommandEvent(Cmd_ModifierKeysChanged));
 	}
 
 	public void OnGUI()
@@ -240,23 +247,16 @@ public class VectorShapeEditor : EditorWindow {
 					}
 					handled = true;
 					break;
+				case Cmd_ModifierKeysChanged:
+					Repaint();
+					handled = true;
+					break;
 			}
 		}
 
 		if (handled)
 		{
 			guiEvent.Use();
-		}
-	}
-
-	public void Update()
-	{
-		// HACK this is the ONLY way to actually get new GUI events
-		// to determine if the modifier keys are down.
-		// http://www.isthenewinputhereyet.com
-		if (EditorWindow.mouseOverWindow == this)
-		{
-			Repaint();
 		}
 	}
 
@@ -280,14 +280,14 @@ public class VectorShapeEditor : EditorWindow {
 		CircleShape testCircle = new CircleShape(new Vector2(0, 0), 0.4f);
 		testCircle.colorOutline = Color.black;
 
-		PolyShape testPoly3 = new PolyShape(new Vector2(1, 2), 0.4f, 3);
+		PolyShape testPoly3 = new PolyShape(new Vector2(1, 2), 0.45f, 3);
 		testPoly3.colorOutline = Color.black;
-		PolyShape testPoly4 = new PolyShape(new Vector2(1, 1), 0.4f, 4);
+		PolyShape testPoly4 = new PolyShape(new Vector2(1, 1), 0.50f, 4);
 		testPoly4.colorOutline = Color.black;
 		testPoly4.RotateAround(new Vector2(1, 1), 45);
-		PolyShape testPoly5 = new PolyShape(new Vector2(1, 0), 0.4f, 5);
+		PolyShape testPoly5 = new PolyShape(new Vector2(1, 0), 0.45f, 5);
 		testPoly5.colorOutline = Color.black;
-		PolyShape testPoly6 = new PolyShape(new Vector2(1, -1), 0.4f, 6);
+		PolyShape testPoly6 = new PolyShape(new Vector2(1, -1), 0.45f, 6);
 		testPoly6.colorOutline = Color.black;
 		testPoly6.RotateAround(new Vector2(1, -1), 30);
 
@@ -300,7 +300,7 @@ public class VectorShapeEditor : EditorWindow {
 
 		testWindow.backgroundColor = Color.white;
 		testWindow.Shapes = new List<VectorShape>() { testPoint, testLine, testCircle, testPoly3, testPoly4, testPoly5, testPoly6, testShape };
-		testWindow.Selection = new List<VectorShape>() { testLine, testShape, testPoly5 };
+		//testWindow.Selection = new List<VectorShape>() { testLine, testShape, testPoly5 };
 		testWindow.Focus();
 	}
 }
