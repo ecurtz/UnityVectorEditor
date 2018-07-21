@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 #if UNITY_EDITOR
 using UnityEditor;
@@ -272,10 +271,12 @@ public class PolyShape : VectorShape
 	}
 
 	/// <summary>
-	/// Tesselate the shape into a mesh.
+	/// Tessellate the shape into geometry data.
 	/// </summary>
-	protected override void GenerateMesh()
+	protected override void GenerateGeometry()
 	{
+		if ((shapeGeometry != null) && (!shapeDirty)) return;
+
 		int segmentCount = closed ? vertices.Length + 1: vertices.Length;
 		Shape shape = new Shape()
 		{
@@ -342,9 +343,8 @@ public class PolyShape : VectorShape
 
 		tessellationScene.Root = polyNode;
 
-		shapeMesh = new Mesh();
-		var polyGeometry = VectorUtils.TessellateScene(tessellationScene, tessellationOptions);
-		VectorUtils.FillMesh(shapeMesh, polyGeometry, 1.0f);
+		shapeGeometry = VectorUtils.TessellateScene(tessellationScene, tessellationOptions);
+		shapeDirty = false;
 	}
 
 	/// <summary>
@@ -459,6 +459,7 @@ public class PolyShape : VectorShape
 		}
 
 		shapeBounds = VectorUtils.Bounds(pointList);
+		boundsDirty = false;
 	}
 
 #if UNITY_EDITOR

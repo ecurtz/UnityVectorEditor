@@ -98,10 +98,12 @@ public class PointShape : VectorShape
 	}
 
 	/// <summary>
-	/// Tesselate the shape into a mesh.
+	/// Tessellate the shape into geometry data.
 	/// </summary>
-	protected override void GenerateMesh()
+	protected override void GenerateGeometry()
 	{
+		if ((shapeGeometry != null) && (!shapeDirty)) return;
+
 		var seg1 = VectorUtils.MakePathLine(
 			new Vector2(position.x, position.y + pointRadius),
 			new Vector2(position.x, position.y - pointRadius)
@@ -149,9 +151,8 @@ public class PointShape : VectorShape
 
 		tessellationScene.Root = markNode;
 
-		shapeMesh = new Mesh();
-		var markGeometry = VectorUtils.TessellateScene(tessellationScene, tessellationOptions);
-		VectorUtils.FillMesh(shapeMesh, markGeometry, 1.0f);
+		shapeGeometry = VectorUtils.TessellateScene(tessellationScene, tessellationOptions);
+		shapeDirty = false;
 	}
 
 	/// <summary>
@@ -186,6 +187,7 @@ public class PointShape : VectorShape
 	protected override void GenerateBounds()
 	{
 		shapeBounds = new Rect(position, Vector2.zero);
+		boundsDirty = false;
 	}
 
 #if UNITY_EDITOR

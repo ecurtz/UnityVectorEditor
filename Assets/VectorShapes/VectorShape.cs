@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using Unity.VectorGraphics;
 
@@ -63,15 +62,16 @@ public abstract class VectorShape
 
 		tessellationOptions = new VectorUtils.TessellationOptions()
 		{
-			StepDistance = 0.1f,
+			StepDistance = 0.05f,
 			MaxCordDeviation = float.MaxValue,
 			MaxTanAngleDeviation = Mathf.PI / 2.0f,
 			SamplingStepSize = 0.01f
 		};
 	}
 
+	public List<VectorUtils.Geometry> shapeGeometry = null;
 	protected Mesh shapeMesh = null;
-	protected bool meshDirty = true;
+	protected bool shapeDirty = true;
 
 	protected Rect shapeBounds = Rect.zero;
 	protected bool boundsDirty = true;
@@ -83,10 +83,9 @@ public abstract class VectorShape
 	{
 		get
 		{
-			if ((shapeMesh == null) || meshDirty)
+			if ((shapeMesh == null) || shapeDirty)
 			{
 				GenerateMesh();
-				meshDirty = false;
 			}
 
 			return shapeMesh;
@@ -103,10 +102,25 @@ public abstract class VectorShape
 			if (boundsDirty)
 			{
 				GenerateBounds();
-				boundsDirty = false;
 			}
 
 			return shapeBounds;
+		}
+	}
+
+	/// <summary>
+	/// Tessellated geometry of the shape.
+	/// </summary>
+	public List<VectorUtils.Geometry> ShapeGeometry
+	{
+		get
+		{
+			if ((shapeGeometry == null) || shapeDirty)
+			{
+				GenerateGeometry();
+			}
+
+			return shapeGeometry;
 		}
 	}
 
@@ -120,13 +134,13 @@ public abstract class VectorShape
 			if (value)
 			{
 				shapeMesh = null;
-				meshDirty = true;
+				shapeDirty = true;
 				boundsDirty = true;
 			}
 		}
 		get
 		{
-			return (meshDirty || boundsDirty);
+			return (shapeDirty || boundsDirty);
 		}
 	}
 
@@ -262,9 +276,22 @@ public abstract class VectorShape
 	public abstract void TransformBy(Matrix2D matrix);
 
 	/// <summary>
-	/// Tesselate the shape into a mesh.
+	/// Build the shape geometry into a mesh.
 	/// </summary>
-	protected abstract void GenerateMesh();
+	protected void GenerateMesh()
+	{
+		if ((shapeMesh != null) && (!shapeDirty)) return;
+
+		GenerateGeometry();
+
+		shapeMesh = new Mesh();
+		VectorUtils.FillMesh(shapeMesh, shapeGeometry, 1.0f);
+	}
+
+	/// <summary>
+	/// Tessellate the shape into geometry data.
+	/// </summary>
+	protected abstract void GenerateGeometry();
 
 	/// <summary>
 	/// Build a 2D bounding box for the shape.

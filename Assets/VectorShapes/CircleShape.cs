@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 #if UNITY_EDITOR
 using UnityEditor;
@@ -113,10 +112,12 @@ public class CircleShape : VectorShape
 	}
 
 	/// <summary>
-	/// Tesselate the shape into a mesh.
+	/// Tessellate the shape into geometry data.
 	/// </summary>
-	protected override void GenerateMesh()
+	protected override void GenerateGeometry()
 	{
+		if ((shapeGeometry != null) && (!shapeDirty)) return;
+
 		var circle = VectorUtils.MakeCircle(position, radius);
 		// Draw the circle using 4 Bezier curves
 		/*
@@ -190,10 +191,10 @@ public class CircleShape : VectorShape
 		};
 
 		tessellationScene.Root = circleNode;
+		shapeGeometry = VectorUtils.TessellateScene(tessellationScene, tessellationOptions);
 
-		shapeMesh = new Mesh();
-		var circleGeometry = VectorUtils.TessellateScene(tessellationScene, tessellationOptions);
-		VectorUtils.FillMesh(shapeMesh, circleGeometry, 1.0f);
+		shapeMesh = null;
+		shapeDirty = false;
 	}
 
 	/// <summary>
@@ -228,6 +229,7 @@ public class CircleShape : VectorShape
 	protected override void GenerateBounds()
 	{
 		shapeBounds = new Rect(position - new Vector2(radius, radius), new Vector2(radius * 2, radius * 2));
+		boundsDirty = false;
 	}
 
 #if UNITY_EDITOR
