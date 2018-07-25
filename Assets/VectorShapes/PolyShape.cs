@@ -229,6 +229,23 @@ public class PolyShape : VectorShape
 	}
 
 	/// <summary>
+	/// Tests if a shape is inside a rectangle.
+	/// </summary>
+	/// <param name="rect">Test rectangle</param>
+	/// <returns>Is the shape entirely inside the rectangle?</returns>
+	public override bool IsInside(Rect rect)
+	{
+		if (boundsDirty) GenerateBounds();
+
+		if (shapeBounds.xMin < rect.xMin) return false;
+		if (shapeBounds.xMax > rect.xMax) return false;
+		if (shapeBounds.yMin < rect.yMin) return false;
+		if (shapeBounds.yMax > rect.yMax) return false;
+
+		return true;
+	}
+
+	/// <summary>
 	/// Rotate the shape around a point.
 	/// </summary>
 	/// <param name="center">Center of rotation</param>
@@ -466,8 +483,9 @@ public class PolyShape : VectorShape
 	/// <summary>
 	/// Draw the point to the active camera using editor handles.
 	/// </summary>
-	/// <param name="active">Is it the selected shape?</param>
-	public override void DrawEditorHandles(bool active)
+	/// <param name="selected">Is the shape selected?</param>
+	/// <param name="active">Is it the active shape?</param>
+	public override void DrawEditorHandles(bool selected, bool active = false)
 	{
 		/*
 		Vector2 midPoint = new Vector2();
@@ -485,6 +503,11 @@ public class PolyShape : VectorShape
 			}
 		}
 		*/
+		if (selected)
+		{
+			if (boundsDirty) GenerateBounds();
+			Handles.DrawSolidRectangleWithOutline(shapeBounds, Color.clear, Handles.color);
+		}
 
 		if (active)
 		{
@@ -533,7 +556,7 @@ public class PolyShape : VectorShape
 	/// Respond to GUI input events in editor.
 	/// </summary>
 	/// <param name="currEvent">The current event</param>
-	/// <param name="active">Is it the selected shape?</param>
+	/// <param name="active">Is it the active shape?</param>
 	/// <returns>Did the shape handle the event?</returns>
 	public override bool HandleEditorEvent(Event currEvent, bool active)
 	{

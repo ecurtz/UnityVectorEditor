@@ -29,7 +29,7 @@ public class PointShape : VectorShape
 	/// <param name="location">Position of point</param>
 	public PointShape(Vector2 location)
 	{
-		this.position = location;
+		position = location;
 	}
 
 	/// <summary>
@@ -39,7 +39,7 @@ public class PointShape : VectorShape
 	/// <param name="y">X position of point</param>
 	public PointShape(float x, float y)
 	{
-		this.position = new Vector2(x, y);
+		position = new Vector2(x, y);
 	}
 
 	/// <summary>
@@ -60,6 +60,16 @@ public class PointShape : VectorShape
 	public override bool Contains(Vector2 pt)
 	{
 		return false;
+	}
+
+	/// <summary>
+	/// Tests if a shape is inside a rectangle.
+	/// </summary>
+	/// <param name="rect">Test rectangle</param>
+	/// <returns>Is the shape entirely inside the rectangle?</returns>
+	public override bool IsInside(Rect rect)
+	{
+		return rect.Contains(position);
 	}
 
 	/// <summary>
@@ -194,8 +204,9 @@ public class PointShape : VectorShape
 	/// <summary>
 	/// Draw the point to the active camera using editor handles.
 	/// </summary>
-	/// <param name="active">Is it the selected shape?</param>
-	public override void DrawEditorHandles(bool active)
+	/// <param name="selected">Is the shape selected?</param>
+	/// <param name="active">Is it the active shape?</param>
+	public override void DrawEditorHandles(bool selected, bool active = false)
 	{
 		/*
 		Color colorPrev = Handles.color;
@@ -224,7 +235,7 @@ public class PointShape : VectorShape
 	/// Respond to GUI input events in editor.
 	/// </summary>
 	/// <param name="currEvent">The current event</param>
-	/// <param name="active">Is it the selected shape?</param>
+	/// <param name="active">Is it the active shape?</param>
 	/// <returns>Did the shape handle the event?</returns>
 	public override bool HandleEditorEvent(Event currEvent, bool active)
 	{

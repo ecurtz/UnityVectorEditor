@@ -257,6 +257,13 @@ public abstract class VectorShape
 	public abstract bool Contains(Vector2 pt);
 
 	/// <summary>
+	/// Tests if a shape is inside a rectangle.
+	/// </summary>
+	/// <param name="rect">Test rectangle</param>
+	/// <returns>Is the shape entirely inside the rectangle?</returns>
+	public abstract bool IsInside(Rect rect);
+
+	/// <summary>
 	/// Rotate the shape around a point.
 	/// </summary>
 	/// <param name="center">Center of rotation</param>
@@ -307,14 +314,15 @@ public abstract class VectorShape
 	/// <summary>
 	/// Draw the shape to the active camera using editor handles.
 	/// </summary>
-	/// <param name="active">Is it the selected shape?</param>
-	public abstract void DrawEditorHandles(bool active);
+	/// <param name="selected">Is the shape selected?</param>
+	/// <param name="active">Is it the active shape?</param>
+	public abstract void DrawEditorHandles(bool selected, bool active = false);
 
 	/// <summary>
 	/// Respond to GUI input events in editor.
 	/// </summary>
 	/// <param name="currEvent">The current event</param>
-	/// <param name="active">Is it the selected shape?</param>
+	/// <param name="active">Is it the active shape?</param>
 	/// <returns>Did the shape handle the event?</returns>
 	public abstract bool HandleEditorEvent(Event currEvent, bool active);
 

@@ -34,8 +34,8 @@ public class CircleShape : VectorShape
 	/// <param name="rad">Radius of circle</param>
 	public CircleShape(Vector2 center, float rad)
 	{
-		this.position = center;
-		this.radius = rad;
+		position = center;
+		radius = rad;
 	}
 
 	/// <summary>
@@ -56,6 +56,30 @@ public class CircleShape : VectorShape
 	public override bool Contains(Vector2 pt)
 	{
 		return (Vector2.Distance(pt, position) < radius);
+	}
+
+	/// <summary>
+	/// Tests if a shape is inside a rectangle.
+	/// </summary>
+	/// <param name="rect">Test rectangle</param>
+	/// <returns>Is the shape entirely inside the rectangle?</returns>
+	public override bool IsInside(Rect rect)
+	{
+		if (!rect.Contains(position)) return false;
+
+		Vector2 testPt = position;
+		testPt.x = position.x - radius;
+		if (!rect.Contains(testPt)) return false;
+		testPt.x = position.x + radius;
+		if (!rect.Contains(testPt)) return false;
+
+		testPt = position;
+		testPt.y = position.y - radius;
+		if (!rect.Contains(testPt)) return false;
+		testPt.y = position.y + radius;
+		if (!rect.Contains(testPt)) return false;
+
+		return true;
 	}
 
 	/// <summary>
@@ -236,8 +260,9 @@ public class CircleShape : VectorShape
 	/// <summary>
 	/// Draw the circle to the active camera using editor handles.
 	/// </summary>
-	/// <param name="active">Is it the selected shape?</param>
-	public override void DrawEditorHandles(bool active)
+	/// <param name="selected">Is the shape selected?</param>
+	/// <param name="active">Is it the active shape?</param>
+	public override void DrawEditorHandles(bool selected, bool active = false)
 	{
 		/*
 		Vector3 handleP0 = new Vector3();
@@ -307,7 +332,7 @@ public class CircleShape : VectorShape
 	/// Respond to GUI input events in editor.
 	/// </summary>
 	/// <param name="currEvent">The current event</param>
-	/// <param name="active">Is it the selected shape?</param>
+	/// <param name="active">Is it the active shape?</param>
 	/// <returns>Did the shape handle the event?</returns>
 	public override bool HandleEditorEvent(Event currEvent, bool active)
 	{

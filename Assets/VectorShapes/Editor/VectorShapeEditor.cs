@@ -168,11 +168,13 @@ public class VectorShapeEditor : EditorWindow
 		}
 	}
 
+	protected List<VectorShape> previousSelection = new List<VectorShape>();
 	protected List<VectorShape> selection = new List<VectorShape>();
 	public List<VectorShape> Selection
 	{
 		set
 		{
+			previousSelection = selection;
 			selection = value;
 
 			Repaint();
@@ -183,8 +185,19 @@ public class VectorShapeEditor : EditorWindow
 		}
 	}
 
-	public Color backgroundColor = Color.gray;
-	protected Vector2 mouseViewPosition;
+	public Color backgroundColor = Color.Lerp(Color.black, Color.white, 0.9f);
+
+	protected Vector2 mousePosition;
+	protected Vector2 mouseDownPosition;
+	protected Matrix2D mouseToShapeMatrix;
+
+	protected bool dragSelecting;
+	protected Rect selectionRect;
+
+	public Vector2 MouseToShapePoint(Vector2 mousePoint)
+	{
+		return mouseToShapeMatrix * mousePoint;
+	}
 
 	public void OnEnable()
 	{
@@ -274,11 +287,13 @@ public class VectorShapeEditor : EditorWindow
 			EditorGUILayout.BeginHorizontal();
 			GUILayout.FlexibleSpace();
 
+			Vector2 shapePosition = MouseToShapePoint(mousePosition);
+
 			GUILayout.Label("Mouse");
 			GUILayout.Label("X", GUILayout.Width(10f));
-			GUILayout.Label(mouseViewPosition.x.ToString("F2"), EditorStyles.textField, GUILayout.Width(50f));
+			GUILayout.Label(shapePosition.x.ToString("F2"), EditorStyles.textField, GUILayout.Width(50f));
 			GUILayout.Label("Y", GUILayout.Width(10f));
-			GUILayout.Label(mouseViewPosition.y.ToString("F2"), EditorStyles.textField, GUILayout.Width(50f));
+			GUILayout.Label(shapePosition.y.ToString("F2"), EditorStyles.textField, GUILayout.Width(50f));
 
 			EditorGUILayout.Space();
 			EditorGUILayout.LabelField("Background", GUILayout.MaxWidth(70f));
@@ -354,7 +369,14 @@ public class VectorShapeEditor : EditorWindow
 
 			foreach (VectorShape selected in selection)
 			{
-				selected.DrawEditorHandles(true);
+				selected.DrawEditorHandles(true, (selection.Count == 1));
+			}
+
+			if (selectionRect != Rect.zero)
+			{
+				Color outlineColor = Handles.color;
+				Color fillColor = new Color(outlineColor.r, outlineColor.g, outlineColor.b, 0.2f);
+				Handles.DrawSolidRectangleWithOutline(selectionRect, fillColor, outlineColor);
 			}
 
 			renderUtil.EndAndDrawPreview(viewRect);
@@ -363,13 +385,26 @@ public class VectorShapeEditor : EditorWindow
 		{
 			float zoomFactor = HandleUtility.niceMouseDeltaZoom;
 			renderUtil.camera.orthographicSize *= (1 - zoomFactor * .02f);
+			float viewScale = renderUtil.camera.orthographicSize * 2f / viewRect.height;
+
+			// Update matrix from mouse to shape space
+			mouseToShapeMatrix =
+				Matrix2D.Translate(renderUtil.camera.transform.position) *
+				Matrix2D.Scale(new Vector2(viewScale, -viewScale)) *
+				Matrix2D.Translate(-viewRect.center);
 
 			handled = true;
 		}
 		else if (guiEvent.isMouse)
 		{
-			Camera camera = renderUtil.camera;
-			float viewScale = camera.orthographicSize * 2f / viewRect.height;
+			float viewScale = renderUtil.camera.orthographicSize * 2f / viewRect.height;
+
+			// Update mouse position and matrix from mouse to shape space
+			mousePosition = guiEvent.mousePosition;
+			mouseToShapeMatrix =
+				Matrix2D.Translate(renderUtil.camera.transform.position) *
+            	Matrix2D.Scale(new Vector2(viewScale, -viewScale)) *
+            	Matrix2D.Translate(-viewRect.center);
 
 			if (activeViewTool != ViewTool.None)
 			{
@@ -377,7 +412,7 @@ public class VectorShapeEditor : EditorWindow
 				{
 					if (activeViewTool == ViewTool.Pan)
 					{
-						camera.transform.position += (Vector3)(guiEvent.delta * new Vector2(-viewScale, viewScale));
+						renderUtil.camera.transform.position += (Vector3)(guiEvent.delta * new Vector2(-viewScale, viewScale));
 					}
 					else if (activeViewTool == ViewTool.Zoom)
 					{
@@ -389,20 +424,48 @@ public class VectorShapeEditor : EditorWindow
 				handled = true;
 			}
 
+			selectionRect = Rect.zero;
+			if (activeTool == VectorTool.Rect)
+			{
+				if (guiEvent.type == EventType.MouseDown)
+				{
+					dragSelecting = false;
+					mouseDownPosition = guiEvent.mousePosition;
+					previousSelection = selection;
+					selection = new List<VectorShape>();
+				}
+				else if (guiEvent.type == EventType.MouseDrag)
+				{
+					Vector2 shapeDownPosition = MouseToShapePoint(mouseDownPosition);
+					Vector2 shapePosition = MouseToShapePoint(mousePosition);
+
+					float minX = Mathf.Min(shapeDownPosition.x, shapePosition.x);
+					float maxX = Mathf.Max(shapeDownPosition.x, shapePosition.x);
+					float minY = Mathf.Min(shapeDownPosition.y, shapePosition.y);
+					float maxY = Mathf.Max(shapeDownPosition.y, shapePosition.y);
+
+					selectionRect = new Rect(minX, minY, maxX - minX, maxY - minY);
+
+					selection.Clear();
+					foreach (VectorShape shape in shapes)
+					{
+						if (shape.IsInside(selectionRect))
+						{
+							selection.Add(shape);
+						}
+					}
+
+					Repaint();
+				}
+
+				handled = true;
+			}
+
 			if (!handled)
 			{
-				// Convert the event to shape space for convenience
-				Vector2 mousePosition = guiEvent.mousePosition;
 				Vector2 delta = guiEvent.delta;
-				Vector2 cameraPos = camera.transform.position;
-				Vector2 viewPos = mousePosition - viewRect.center;
-
-				guiEvent.mousePosition = new Vector2(
-					viewPos.x * viewScale + cameraPos.x,
-					viewPos.y * -viewScale + cameraPos.y
-				);
+				guiEvent.mousePosition = MouseToShapePoint(guiEvent.mousePosition);
 				guiEvent.delta = guiEvent.delta * new Vector2(viewScale, -viewScale);
-				mouseViewPosition = guiEvent.mousePosition;
 
 				foreach (VectorShape selected in selection)
 				{
@@ -501,7 +564,6 @@ public class VectorShapeEditor : EditorWindow
 			testShape.vertices[i].segmentCurves = true;
 		}
 
-		testWindow.backgroundColor = Color.white;
 		testWindow.Shapes = new List<VectorShape>() { testPoint, testLine, testCircle, testPoly3, testPoly4, testPoly5, testPoly6, testShape };
 		//testWindow.Selection = new List<VectorShape>() { testLine, testShape, testPoly5 };
 		testWindow.Focus();
