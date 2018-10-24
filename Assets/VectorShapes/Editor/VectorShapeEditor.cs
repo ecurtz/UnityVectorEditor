@@ -10,7 +10,7 @@ public class VectorShapeEditor : EditorWindow
 	/// <summary>
 	/// Tool set for vector editor
 	/// </summary>
-	public enum VectorTool
+	protected enum VectorTool
 	{
 		None = -1,
 		View,
@@ -21,6 +21,16 @@ public class VectorShapeEditor : EditorWindow
 		Circle,
 		Poly,
 		Shape
+	}
+
+	/// <summary>
+	/// Behavior of selection operations
+	/// </summary>
+	protected enum SelectionType
+	{
+		Normal,
+		Additive,
+		Subtractive
 	}
 
 	/// <remarks>
@@ -62,9 +72,40 @@ public class VectorShapeEditor : EditorWindow
 	protected static GUIContent[] toolbarOnIcons;
 
 	/// <summary>
+	/// Create a Texture2D icon of a VectorShape.
+	/// </summary>
+	private Texture2D RenderShapeToIcon(VectorShape shape, int width, int height)
+	{
+		// Save the render state and get a temporary render texture
+		RenderTexture activeTexture = RenderTexture.active;
+		renderUtil.camera.targetTexture = RenderTexture.GetTemporary(width, height, 8, RenderTextureFormat.ARGB32);
+		renderUtil.camera.backgroundColor = Color.clear;
+		Matrix4x4 drawMatrix = Matrix4x4.identity;
+		renderUtil.DrawMesh(shape.ShapeMesh, drawMatrix, renderMaterial, 0);
+		shape.colorOutline = Color.white;
+		shape.TranslateBy(new Vector2(0f, -2f / height));
+		drawMatrix.SetTRS(new Vector3(0f, 0f, 0.05f), Quaternion.identity, Vector3.one);
+		renderUtil.DrawMesh(shape.ShapeMesh, drawMatrix, renderMaterial, 0);
+
+		// Activate the render texture and draw the shape into it
+		RenderTexture.active = renderUtil.camera.targetTexture;
+		renderUtil.camera.Render();
+		Texture2D iconTexture = new Texture2D(width, height);
+		iconTexture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+		iconTexture.Apply();
+
+		// Restore the render state and release the temporary render texture
+		RenderTexture.active = activeTexture;
+		RenderTexture.ReleaseTemporary(renderUtil.camera.targetTexture);
+
+		return iconTexture;
+	}
+
+	/// <summary>
 	/// Initializes the GUI Content.
 	/// </summary>
-	private static void InitializeGUIContent()
+	const int iconHeight = 18;
+	private void InitializeGUIContent()
 	{
 		if (renderMaterial == null)
 		{
@@ -79,48 +120,63 @@ public class VectorShapeEditor : EditorWindow
 			toolbarIcons[IconMove] = EditorGUIUtility.IconContent("MoveTool", "|Move Tool");
 			toolbarIcons[IconRect] = EditorGUIUtility.IconContent("RectTool", "|Rect Tool");
 
-			toolbarIcons[IconPoint] = EditorGUIUtility.IconContent("CreatePoint", "|Create Point");
+			float penSize = VectorShape.penSize;
+			float pointRadius = PointShape.pointRadius;
 
-			//VectorShape shape = new PointShape(Vector2.zero);
-			//Sprite sprite = VectorUtils.BuildSprite(shape.ShapeGeometry, 1f, VectorUtils.Alignment.Center, Vector2.zero, 128);
-			//Texture2D icon = VectorUtils.RenderSpriteToTexture2D(sprite, 18, 18, renderMaterial);
-			//toolbarIcons[IconPoint] = new GUIContent(icon, "Create Point");
+			VectorShape shape;
+			Texture2D icon;
 
-			toolbarIcons[IconSpline] = EditorGUIUtility.IconContent("CreateSpline", "|Create Spline");
-			toolbarIcons[IconCircle] = EditorGUIUtility.IconContent("CreateCircle", "|Create Circle");
-			toolbarIcons[IconPolygon] = EditorGUIUtility.IconContent("CreatePolygon", "|Create Polygon");
-			toolbarIcons[IconPolyTri] = EditorGUIUtility.IconContent("CreateTriangle", "|Create Triangle");
-			toolbarIcons[IconPolyRect] = EditorGUIUtility.IconContent("CreateRectangle", "|Create Rectangle");
-			toolbarIcons[IconPolyPent] = EditorGUIUtility.IconContent("CreatePentagon", "|Create Pentagon");
-			toolbarIcons[IconPolyHex] = EditorGUIUtility.IconContent("CreateHexagon", "|Create Hexagon");
-			toolbarIcons[IconShape] = EditorGUIUtility.IconContent("CreateShape", "|Create Shape");
+			VectorShape.penSize = (3f / iconHeight) * Screen.dpi;
+			PointShape.pointRadius = 0.5f;
+
+			shape = new PointShape(Vector2.zero);
+			icon = RenderShapeToIcon(shape, iconHeight, iconHeight);
+			toolbarIcons[IconPoint] = new GUIContent(icon, "Create Point");
+
+			VectorShape.penSize = (2f / iconHeight) * Screen.dpi;
+
+			Vector2[] splinePoints = {
+				new Vector2(-0.8f, -0.1f),
+				new Vector2(-0.4f, 0.3f),
+				new Vector2(0.4f, -0.4f),
+				new Vector2(0.8f, 0.2f)};
+			shape = new PolyShape(splinePoints, true);
+			icon = RenderShapeToIcon(shape, iconHeight, iconHeight);
+			toolbarIcons[IconSpline] = new GUIContent(icon, "Create Spline");
+				
+			shape = new CircleShape(Vector2.zero, 0.8f);
+			icon = RenderShapeToIcon(shape, iconHeight, iconHeight);
+			toolbarIcons[IconCircle] = new GUIContent(icon, "Create Circle");
+
+			shape = new PolyShape(Vector2.zero, 0.8f, 3);
+			icon = RenderShapeToIcon(shape, iconHeight, iconHeight);
+			toolbarIcons[IconPolyTri] = new GUIContent(icon, "Create Triangle");
+
+			shape = new PolyShape(Vector2.zero, 0.8f, 4);
+			icon = RenderShapeToIcon(shape, iconHeight, iconHeight);
+			toolbarIcons[IconPolyRect] = new GUIContent(icon, "Create Rectangle");
+
+			shape = new PolyShape(Vector2.zero, 0.8f, 5);
+			icon = RenderShapeToIcon(shape, iconHeight, iconHeight);
+			toolbarIcons[IconPolyPent] = new GUIContent(icon, "Create Pentagon");
+
+			shape = new PolyShape(Vector2.zero, 0.85f, 6);
+			shape.RotateAround(Vector2.zero, 30f);
+			icon = RenderShapeToIcon(shape, iconHeight, iconHeight);
+			toolbarIcons[IconPolyHex] = new GUIContent(icon, "Create Hexagon");
+
+			shape = new PolyShape(Vector2.zero, 0.8f, 5);
+			icon = RenderShapeToIcon(shape, iconHeight, iconHeight);
+			toolbarIcons[IconPolygon] = new GUIContent(icon, "Create Polygon");
+
+			shape = new PolyShape(Vector2.zero, 0.8f, 5);
+			icon = RenderShapeToIcon(shape, iconHeight, iconHeight);
+			toolbarIcons[IconShape] = new GUIContent(icon, "Create Shape");
+
+
+			VectorShape.penSize = penSize;
+			PointShape.pointRadius = pointRadius;
 		}
-
-		/*
-		if (toolbarOnIcons == null)
-		{
-			toolbarOnIcons = new GUIContent[IconCount];
-			toolbarOnIcons[IconViewPan] = EditorGUIUtility.IconContent("ViewToolMove On");
-			toolbarOnIcons[IconViewZoom] = EditorGUIUtility.IconContent("ViewToolZoom On");
-			toolbarOnIcons[IconMove] = EditorGUIUtility.IconContent("MoveTool On");
-			toolbarOnIcons[IconRect] = EditorGUIUtility.IconContent("RectTool On");
-			toolbarOnIcons[IconPoint] = EditorGUIUtility.IconContent("CreatePoint On");
-			toolbarOnIcons[IconSpline] = EditorGUIUtility.IconContent("CreateSpline On");
-			toolbarOnIcons[IconCircle] = EditorGUIUtility.IconContent("CreateCircle On");
-			toolbarOnIcons[IconPolygon] = EditorGUIUtility.IconContent("CreateTri On");
-			toolbarOnIcons[IconPolyTri] = EditorGUIUtility.IconContent("CreateTri On");
-			toolbarOnIcons[IconPolyRect] = EditorGUIUtility.IconContent("CreateRect On");
-			toolbarOnIcons[IconPolyPent] = EditorGUIUtility.IconContent("CreatePent On");
-			toolbarOnIcons[IconPolyHex] = EditorGUIUtility.IconContent("CreateHex On");
-			toolbarOnIcons[IconShape] = EditorGUIUtility.IconContent("CreateShape On");
-
-			for (int i = 0; i < ButtonCount; i++)
-			{
-				toolbarOnIcons[i].text = toolbarIcons[i].text;
-				toolbarOnIcons[i].tooltip = toolbarIcons[i].tooltip;
-			}
-		}
-		*/
 	}
 
 	/// <summary>
@@ -141,6 +197,8 @@ public class VectorShapeEditor : EditorWindow
 	protected int selectedPoly = 1;
 	protected VectorTool activeTool;
 	protected ViewTool activeViewTool;
+	protected VectorShape activeShape;
+
 	protected GUIContent[] toolbar = new GUIContent[ButtonCount];
 
 	protected PreviewRenderUtility renderUtil = null;
@@ -189,9 +247,13 @@ public class VectorShapeEditor : EditorWindow
 
 	protected Vector2 mousePosition;
 	protected Vector2 mouseDownPosition;
+	protected bool mouseInContent;
+
+	protected float mouseToShapeScale;
 	protected Matrix2D mouseToShapeMatrix;
 
-	protected bool dragSelecting;
+	const float dragMargin = 8f;
+	protected bool dragActive;
 	protected Rect selectionRect;
 
 	public Vector2 MouseToShapePoint(Vector2 mousePoint)
@@ -201,8 +263,6 @@ public class VectorShapeEditor : EditorWindow
 
 	public void OnEnable()
 	{
-		InitializeGUIContent();
-
 		renderUtil = new PreviewRenderUtility();
 		renderUtil.camera.orthographic = true;
 		renderUtil.camera.orthographicSize = 1f;
@@ -211,8 +271,16 @@ public class VectorShapeEditor : EditorWindow
 		renderUtil.camera.farClipPlane = 100.0f;
 		renderUtil.camera.transform.position = new Vector3(0, 0, -1);
 
+		InitializeGUIContent();
+
 		EditorApplication.modifierKeysChanged += OnModifierKeys;
 		this.wantsMouseMove = true;
+	}
+
+	public void OnDisable()
+	{
+		renderUtil.Cleanup();
+		EditorApplication.modifierKeysChanged -= OnModifierKeys;
 	}
 
 	public void OnModifierKeys()
@@ -369,7 +437,7 @@ public class VectorShapeEditor : EditorWindow
 
 			foreach (VectorShape selected in selection)
 			{
-				selected.DrawEditorHandles(true, (selection.Count == 1));
+				selected.DrawEditorHandles(true, (selected == activeShape));
 			}
 
 			if (selectionRect != Rect.zero)
@@ -385,87 +453,58 @@ public class VectorShapeEditor : EditorWindow
 		{
 			float zoomFactor = HandleUtility.niceMouseDeltaZoom;
 			renderUtil.camera.orthographicSize *= (1 - zoomFactor * .02f);
-			float viewScale = renderUtil.camera.orthographicSize * 2f / viewRect.height;
 
 			// Update matrix from mouse to shape space
+			mouseToShapeScale = renderUtil.camera.orthographicSize * 2f / viewRect.height;
 			mouseToShapeMatrix =
 				Matrix2D.Translate(renderUtil.camera.transform.position) *
-				Matrix2D.Scale(new Vector2(viewScale, -viewScale)) *
+		        Matrix2D.Scale(new Vector2(mouseToShapeScale, -mouseToShapeScale)) *
 				Matrix2D.Translate(-viewRect.center);
 
 			handled = true;
 		}
 		else if (guiEvent.isMouse)
 		{
-			float viewScale = renderUtil.camera.orthographicSize * 2f / viewRect.height;
-
 			// Update mouse position and matrix from mouse to shape space
+			mouseToShapeScale = renderUtil.camera.orthographicSize * 2f / viewRect.height;
 			mousePosition = guiEvent.mousePosition;
 			mouseToShapeMatrix =
 				Matrix2D.Translate(renderUtil.camera.transform.position) *
-            	Matrix2D.Scale(new Vector2(viewScale, -viewScale)) *
+		        Matrix2D.Scale(new Vector2(mouseToShapeScale, -mouseToShapeScale)) *
             	Matrix2D.Translate(-viewRect.center);
 
-			if (activeViewTool != ViewTool.None)
-			{
-				if (guiEvent.type == EventType.MouseDrag)
-				{
-					if (activeViewTool == ViewTool.Pan)
-					{
-						renderUtil.camera.transform.position += (Vector3)(guiEvent.delta * new Vector2(-viewScale, viewScale));
-					}
-					else if (activeViewTool == ViewTool.Zoom)
-					{
-						float zoomFactor = HandleUtility.niceMouseDeltaZoom;
-						renderUtil.camera.orthographicSize *= (1 + zoomFactor * .005f);
-					}
-				}
+			mouseInContent = (viewRect.Contains(mousePosition));
 
-				handled = true;
+			if ((activeTool == VectorTool.View) || (activeViewTool != ViewTool.None))
+			{
+				handled = OnViewToolMouse(guiEvent);
 			}
-
-			selectionRect = Rect.zero;
-			if (activeTool == VectorTool.Rect)
+			else if (activeTool == VectorTool.Move)
 			{
-				if (guiEvent.type == EventType.MouseDown)
-				{
-					dragSelecting = false;
-					mouseDownPosition = guiEvent.mousePosition;
-					previousSelection = selection;
-					selection = new List<VectorShape>();
-				}
-				else if (guiEvent.type == EventType.MouseDrag)
-				{
-					Vector2 shapeDownPosition = MouseToShapePoint(mouseDownPosition);
-					Vector2 shapePosition = MouseToShapePoint(mousePosition);
-
-					float minX = Mathf.Min(shapeDownPosition.x, shapePosition.x);
-					float maxX = Mathf.Max(shapeDownPosition.x, shapePosition.x);
-					float minY = Mathf.Min(shapeDownPosition.y, shapePosition.y);
-					float maxY = Mathf.Max(shapeDownPosition.y, shapePosition.y);
-
-					selectionRect = new Rect(minX, minY, maxX - minX, maxY - minY);
-
-					selection.Clear();
-					foreach (VectorShape shape in shapes)
-					{
-						if (shape.IsInside(selectionRect))
-						{
-							selection.Add(shape);
-						}
-					}
-
-					Repaint();
-				}
-
-				handled = true;
+				handled = OnMoveToolMouse(guiEvent);
+			}
+			else if (activeTool == VectorTool.Rect)
+			{
+				handled = OnRectToolMouse(guiEvent);
+			}
+			else if (activeTool == VectorTool.Point)
+			{
+				handled = OnPointToolMouse(guiEvent);
+			}
+			else if (activeTool == VectorTool.Line)
+			{
+				handled = OnLineToolMouse(guiEvent);
+			}
+			else if (activeTool == VectorTool.Circle)
+			{
+				handled = OnCircleToolMouse(guiEvent);
 			}
 
 			if (!handled)
 			{
 				Vector2 delta = guiEvent.delta;
-				guiEvent.mousePosition = MouseToShapePoint(guiEvent.mousePosition);
-				guiEvent.delta = guiEvent.delta * new Vector2(viewScale, -viewScale);
+				guiEvent.mousePosition = MouseToShapePoint(mousePosition);
+				guiEvent.delta = guiEvent.delta * new Vector2(mouseToShapeScale, -mouseToShapeScale);
 
 				foreach (VectorShape selected in selection)
 				{
@@ -526,6 +565,191 @@ public class VectorShapeEditor : EditorWindow
 		}
 	}
 
+	protected bool OnViewToolMouse(Event guiEvent)
+	{
+		if (guiEvent.type == EventType.MouseDrag)
+		{
+			if ((activeViewTool == ViewTool.Pan) && mouseInContent)
+			{
+				renderUtil.camera.transform.position += (Vector3)(guiEvent.delta * new Vector2(-mouseToShapeScale, mouseToShapeScale));
+			}
+			else if (activeViewTool == ViewTool.Zoom)
+			{
+				float zoomFactor = HandleUtility.niceMouseDeltaZoom;
+				renderUtil.camera.orthographicSize *= (1 + zoomFactor * .005f);
+			}
+		}
+
+		return true;
+	}
+
+	protected bool OnMoveToolMouse(Event guiEvent)
+	{
+		return false;
+	}
+
+	protected bool OnRectToolMouse(Event guiEvent)
+	{
+		selectionRect = Rect.zero;
+		if (guiEvent.type == EventType.MouseDown)
+		{
+			dragActive = false;
+			mouseDownPosition = guiEvent.mousePosition;
+			previousSelection = selection;
+			selection = new List<VectorShape>();
+		}
+		else if (guiEvent.type == EventType.MouseDrag)
+		{
+			Vector2 shapeDownPosition = MouseToShapePoint(mouseDownPosition);
+			Vector2 shapePosition = MouseToShapePoint(mousePosition);
+
+			float minX = Mathf.Min(shapeDownPosition.x, shapePosition.x);
+			float maxX = Mathf.Max(shapeDownPosition.x, shapePosition.x);
+			float minY = Mathf.Min(shapeDownPosition.y, shapePosition.y);
+			float maxY = Mathf.Max(shapeDownPosition.y, shapePosition.y);
+
+			selectionRect = new Rect(minX, minY, maxX - minX, maxY - minY);
+
+			selection.Clear();
+			foreach (VectorShape shape in shapes)
+			{
+				if (shape.IsInside(selectionRect))
+				{
+					selection.Add(shape);
+				}
+			}
+
+			Repaint();
+		}
+
+		return true;
+	}
+
+	protected bool OnPointToolMouse(Event guiEvent)
+	{
+		if (guiEvent.type == EventType.MouseDown)
+		{
+			PointShape newPoint = new PointShape(MouseToShapePoint(mousePosition));
+			SetActiveShape(newPoint);
+
+			Repaint();
+		}
+
+		return true;
+	}
+
+	protected bool OnLineToolMouse(Event guiEvent)
+	{
+		Vector2 shapePosition = MouseToShapePoint(mousePosition);
+
+		if (guiEvent.type == EventType.MouseDown)
+		{
+			mouseDownPosition = guiEvent.mousePosition;
+			dragActive = false;
+
+			PolyShape activeLine = activeShape as PolyShape;
+			if (activeLine == null)
+			{
+				PolyShape newLine = new PolyShape(new Vector2[] { shapePosition });
+				newLine.closed = false;
+				SetActiveShape(newLine);
+			}
+			else
+			{
+				activeLine.AppendVertex(shapePosition);
+				if (guiEvent.clickCount > 1)
+				{
+					activeShape = null;
+				}
+			}
+			Repaint();
+		}
+		else if (guiEvent.type == EventType.MouseDrag)
+		{
+			PolyShape activeLine = activeShape as PolyShape;
+			if ((activeLine != null) && (activeLine.vertices.Length > 1))
+			{
+				int vertexIndex = activeLine.vertices.Length - 1;
+				Vector2 offset;
+
+				if ((!dragActive) && (Vector2.Distance(mouseDownPosition, guiEvent.mousePosition) > dragMargin))
+				{
+					dragActive = true;
+					int previousIndex = vertexIndex - 1;
+
+					if (!activeLine.vertices[previousIndex].segmentCurves)
+					{
+						activeLine.vertices[previousIndex].segmentCurves = true;
+						offset = (activeLine.vertices[vertexIndex].position - activeLine.vertices[previousIndex].position) / 2f;
+						activeLine.vertices[previousIndex].exitCP = activeLine.vertices[previousIndex].position + offset;
+						if ((previousIndex < 1) || (!activeLine.vertices[previousIndex - 1].segmentCurves))
+						{
+							activeLine.vertices[previousIndex].enterCP = activeLine.vertices[previousIndex].position - offset;
+						}
+					}
+				}
+
+				if (dragActive)
+				{
+					activeLine.vertices[vertexIndex].exitCP = shapePosition;
+					offset = activeLine.vertices[vertexIndex].exitCP - activeLine.vertices[vertexIndex].position;
+					activeLine.vertices[vertexIndex].enterCP = activeLine.vertices[vertexIndex].position - offset;
+
+					activeLine.Dirty = true;
+					Repaint();
+				}
+			}
+		}
+
+		return true;
+	}
+
+	protected bool OnCircleToolMouse(Event guiEvent)
+	{
+		Vector2 shapePosition = MouseToShapePoint(mousePosition);
+
+		if (guiEvent.type == EventType.MouseDown)
+		{
+			mouseDownPosition = guiEvent.mousePosition;
+			CircleShape newCircle = new CircleShape(shapePosition, 0f);
+			SetActiveShape(newCircle);
+
+			Repaint();
+		}
+		else if (guiEvent.type == EventType.MouseDrag)
+		{
+			CircleShape activeCircle = activeShape as CircleShape;
+			if (activeCircle != null)
+			{
+				Vector2 shapeDownPosition = MouseToShapePoint(mouseDownPosition);
+				activeCircle.Radius = Vector2.Distance(shapeDownPosition, shapePosition);
+
+				Repaint();
+			}
+		}
+		else if (guiEvent.type == EventType.MouseUp)
+		{
+			activeShape = null;
+		}
+
+		return true;
+	}
+
+	protected void SetActiveShape(VectorShape shape)
+	{
+		activeShape = shape;
+		selection.Clear();
+
+		if (shape != null)
+		{
+			if (!shapes.Contains(shape))
+			{
+				shapes.Add(shape);
+			}
+			selection.Add(shape);
+		}
+	}
+
 	[MenuItem("Testing/Vector Shape Editor")]
 	public static void OpenTestWindow()
 	{
@@ -565,7 +789,6 @@ public class VectorShapeEditor : EditorWindow
 		}
 
 		testWindow.Shapes = new List<VectorShape>() { testPoint, testLine, testCircle, testPoly3, testPoly4, testPoly5, testPoly6, testShape };
-		//testWindow.Selection = new List<VectorShape>() { testLine, testShape, testPoly5 };
 		testWindow.Focus();
 	}
 }

@@ -132,20 +132,20 @@ public class PointShape : VectorShape
 			}
 		};
 
-		Path path1 = new Path()
+		Shape path1 = new Shape()
 		{
-			Contour = new BezierContour()
+			Contours = new BezierContour[]
 			{
-				Segments = seg1
+				new BezierContour {Segments = seg1}
 			},
 			PathProps = pathProps
 		};
 
-		Path path2 = new Path()
+		Shape path2 = new Shape()
 		{
-			Contour = new BezierContour()
+			Contours = new BezierContour[]
 			{
-				Segments = seg2
+				new BezierContour {Segments = seg2}
 			},
 			PathProps = pathProps
 		};
@@ -153,7 +153,7 @@ public class PointShape : VectorShape
 		SceneNode markNode = new SceneNode()
 		{
 			Transform = Matrix2D.identity,
-			Drawables = new List<IDrawable>
+			Shapes = new List<Shape>
 			{
 				path1, path2
 			}

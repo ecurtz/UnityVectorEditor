@@ -17,15 +17,40 @@ public class CircleShape : VectorShape
 	/// </summary>
 	const float bezierCircleConst = 0.55191502449f;
 
+	protected Vector2 position;
+	protected float radius = 0f;
+
 	/// <summary>
 	/// Position of center.
 	/// </summary>
-	public Vector2 position;
+	public Vector2 Position
+	{
+		set
+		{
+			position = value;
+			Dirty = true;
+		}
+		get
+		{
+			return position;
+		}
+	}
 
 	/// <summary>
 	/// Radius of circle.
 	/// </summary>
-	public float radius = 1f;
+	public float Radius
+	{
+		set
+		{
+			radius = value;
+			Dirty = true;
+		}
+		get
+		{
+			return radius;
+		}
+	}
 
 	/// <summary>
 	/// New circle from center point and radius.
@@ -142,7 +167,8 @@ public class CircleShape : VectorShape
 	{
 		if ((shapeGeometry != null) && (!shapeDirty)) return;
 
-		var circle = VectorUtils.MakeCircle(position, radius);
+		Shape circle = new Shape();
+		VectorUtils.MakeCircleShape(circle, position, radius);
 		// Draw the circle using 4 Bezier curves
 		/*
 		var circle = new Shape()
@@ -208,7 +234,7 @@ public class CircleShape : VectorShape
 		SceneNode circleNode = new SceneNode()
 		{
 			Transform = Matrix2D.identity,
-			Drawables = new List<IDrawable>
+			Shapes = new List<Shape>
 			{
 				circle
 			}

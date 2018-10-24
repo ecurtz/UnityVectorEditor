@@ -127,7 +127,7 @@ public abstract class VectorShape
 	/// <summary>
 	/// Is the shape dirty?
 	/// </summary>
-	protected bool Dirty
+	public bool Dirty
 	{
 		set
 		{

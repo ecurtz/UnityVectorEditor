@@ -105,7 +105,9 @@ public class PolyShape : VectorShape
 	/// <summary>
 	/// New shape from array of points.
 	/// </summary>
-	public PolyShape(Vector2[] points)
+	/// <param name="points">Array of vertex positions</param>
+	/// <param name="curve">Do the segments curve?</param>
+	public PolyShape(Vector2[] points, bool curve = false)
 	{
 		int vertexCount = points.Length;
 		vertices = new Vertex[vertexCount];
@@ -114,6 +116,7 @@ public class PolyShape : VectorShape
 		{
 			vertices[i] = new Vertex();
 			vertices[i].position = points[i];
+			vertices[i].segmentCurves = curve;
 		}
 
 		for (int i = 0; i < vertexCount; i++)
@@ -168,6 +171,24 @@ public class PolyShape : VectorShape
 
 		vertices[index].enterCP = vertices[index].position + direction * (prevOffset.magnitude * 0.5f);
 		vertices[index].exitCP = vertices[index].position + direction * (-nextOffset.magnitude * 0.5f);
+	}
+
+	/// <summary>
+	/// Add a new vertex onto the shape.
+	/// </summary>
+	/// <param name="pt">New vertex</param>
+	public void AppendVertex(Vector2 pt)
+	{
+		int newIndex = vertices.Length;
+		int previousIndex = PreviousIndex(newIndex);
+
+		Vertex newVertex = new Vertex();
+		newVertex.position = pt;
+		List<Vertex> newVertices = new List<Vertex>(vertices);
+		newVertices.Add(newVertex);
+		vertices = newVertices.ToArray();
+
+		Dirty = true;
 	}
 
 	/// <summary>
@@ -294,14 +315,13 @@ public class PolyShape : VectorShape
 	{
 		if ((shapeGeometry != null) && (!shapeDirty)) return;
 
-		int segmentCount = closed ? vertices.Length + 1: vertices.Length;
 		Shape shape = new Shape()
 		{
 			Contours = new BezierContour[]
 			{
 				new BezierContour()
 				{
-					Segments = new BezierPathSegment[segmentCount],
+					Segments = new BezierPathSegment[vertices.Length],
 					Closed = closed
 				}
 			},
@@ -323,8 +343,7 @@ public class PolyShape : VectorShape
 			};
 		}
 
-		int vertexCount = segmentCount - 1;
-		for (int i = 0; i < vertexCount; i++)
+		for (int i = 0; i < vertices.Length; i++)
 		{
 			shape.Contours[0].Segments[i].P0 = vertices[i].position;
 			if (vertices[i].segmentCurves)
@@ -340,19 +359,10 @@ public class PolyShape : VectorShape
 			}
 		}
 
-		if (closed)
-		{
-			shape.Contours[0].Segments[vertexCount].P0 = vertices[0].position;
-		}
-		else
-		{
-			shape.Contours[0].Segments[vertexCount].P0 = vertices[vertexCount].position;
-		}
-
 		SceneNode polyNode = new SceneNode()
 		{
 			Transform = Matrix2D.identity,
-			Drawables = new List<IDrawable>
+			Shapes = new List<Shape>
 			{
 				shape
 			}
