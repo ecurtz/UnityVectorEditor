@@ -10,10 +10,11 @@ using Unity.VectorGraphics;
 /// <summary>
 /// Vector circle.
 /// </summary>
-public class CircleShape : VectorShape
+public class EllipseShape : VectorShape
 {
 	protected Vector2 position;
-	protected float radius;
+	protected float radiusX = 0f;
+	protected float radiusY = 0f;
 
 	/// <summary>
 	/// Position of center.
@@ -32,30 +33,48 @@ public class CircleShape : VectorShape
 	}
 
 	/// <summary>
-	/// Radius of circle.
+	/// Radius of ellipse on X axis.
 	/// </summary>
-	public float Radius
+	public float RadiusX
 	{
 		set
 		{
-			radius = value;
+			radiusX = value;
 			Dirty = true;
 		}
 		get
 		{
-			return radius;
+			return radiusX;
 		}
 	}
 
 	/// <summary>
-	/// New circle from center point and radius.
+	/// Radius of ellipse on Y axis.
+	/// </summary>
+	public float RadiusY
+	{
+		set
+		{
+			radiusY = value;
+			Dirty = true;
+		}
+		get
+		{
+			return radiusY;
+		}
+	}
+
+	/// <summary>
+	/// New ellipse from center point and radii.
 	/// </summary>
 	/// <param name="center">Center of circle</param>
-	/// <param name="rad">Radius of circle</param>
-	public CircleShape(Vector2 center, float rad)
+	/// <param name="radX">Radius of ellipse on X axis</param>
+	/// <param name="radY">Radius of ellipse on Y axis</param>
+	public EllipseShape(Vector2 center, float radX, float radY)
 	{
 		position = center;
-		radius = rad;
+		radiusX = radX;
+		radiusY = radY;
 	}
 
 	/// <summary>
@@ -65,7 +84,7 @@ public class CircleShape : VectorShape
 	/// <returns>Distance from point to nearest point on shape</returns>
 	public override float Distance(Vector2 pt)
 	{
-		return Mathf.Abs(Vector2.Distance(pt, position) - radius);
+		return Mathf.Abs(Vector2.Distance(pt, position) - radiusX);
 	}
 
 	/// <summary>
@@ -75,7 +94,7 @@ public class CircleShape : VectorShape
 	/// <returns>Is the point inside the shape?</returns>
 	public override bool Contains(Vector2 pt)
 	{
-		return (Vector2.Distance(pt, position) < radius);
+		return (Vector2.Distance(pt, position) < radiusX);
 	}
 
 	/// <summary>
@@ -88,15 +107,15 @@ public class CircleShape : VectorShape
 		if (!rect.Contains(position)) return false;
 
 		Vector2 testPt = position;
-		testPt.x = position.x - radius;
+		testPt.x = position.x - radiusX;
 		if (!rect.Contains(testPt)) return false;
-		testPt.x = position.x + radius;
+		testPt.x = position.x + radiusX;
 		if (!rect.Contains(testPt)) return false;
 
 		testPt = position;
-		testPt.y = position.y - radius;
+		testPt.y = position.y - radiusY;
 		if (!rect.Contains(testPt)) return false;
-		testPt.y = position.y + radius;
+		testPt.y = position.y + radiusY;
 		if (!rect.Contains(testPt)) return false;
 
 		return true;
@@ -133,10 +152,10 @@ public class CircleShape : VectorShape
 	public override void TransformBy(Matrix2D matrix)
 	{
 		// Attempt to identify uniform scaling
-		Vector2 pt0 = matrix.MultiplyPoint(position + new Vector2(0, radius));
-		Vector2 pt1 = matrix.MultiplyPoint(position + new Vector2(0, -radius));
-		Vector2 pt2 = matrix.MultiplyPoint(position + new Vector2(radius, 0));
-		Vector2 pt3 = matrix.MultiplyPoint(position + new Vector2(-radius, 0));
+		Vector2 pt0 = matrix.MultiplyPoint(position + new Vector2(0, radiusY));
+		Vector2 pt1 = matrix.MultiplyPoint(position + new Vector2(0, -radiusY));
+		Vector2 pt2 = matrix.MultiplyPoint(position + new Vector2(radiusX, 0));
+		Vector2 pt3 = matrix.MultiplyPoint(position + new Vector2(-radiusX, 0));
 
 		position = matrix.MultiplyPoint(position);
 
@@ -145,11 +164,11 @@ public class CircleShape : VectorShape
 		    Mathf.Approximately(distSqr, Vector2.SqrMagnitude(pt2 - position)) &&
 		    Mathf.Approximately(distSqr, Vector2.SqrMagnitude(pt3 - position)))
 		{
-			radius = Mathf.Sqrt(distSqr);
+			radiusX = Mathf.Sqrt(distSqr);
 		}
 		else
 		{
-			Debug.LogWarning("Ignored matrix change that would destroy circle.");
+			Debug.LogWarning("Ignored matrix change that would destroy ellipse.");
 		}
 
 		Dirty = true;
@@ -162,10 +181,10 @@ public class CircleShape : VectorShape
 	{
 		if ((shapeGeometry != null) && (!shapeDirty)) return;
 
-		Shape circle = new Shape();
-		VectorUtils.MakeCircleShape(circle, position, radius);
+		Shape ellipse = new Shape();
+		VectorUtils.MakeEllipseShape(ellipse, position, radiusX, radiusY);
 
-		circle.PathProps = new PathProperties()
+		ellipse.PathProps = new PathProperties()
 		{
 			Stroke = new Stroke()
 			{
@@ -175,7 +194,7 @@ public class CircleShape : VectorShape
 		};
 		if (colorFill != Color.clear)
 		{
-			circle.Fill = new SolidFill()
+			ellipse.Fill = new SolidFill()
 			{
 				Color = colorFill
 			};
@@ -186,7 +205,7 @@ public class CircleShape : VectorShape
 			Transform = matrixTransform,
 			Shapes = new List<Shape>
 			{
-				circle
+				ellipse
 			}
 		};
 
@@ -202,7 +221,7 @@ public class CircleShape : VectorShape
 	/// </summary>
 	protected override void GenerateBounds()
 	{
-		shapeBounds = new Rect(position - new Vector2(radius, radius), new Vector2(radius * 2, radius * 2));
+		shapeBounds = new Rect(position - new Vector2(radiusX, radiusY), new Vector2(radiusX * 2, radiusY * 2));
 		boundsDirty = false;
 	}
 
@@ -229,7 +248,7 @@ public class CircleShape : VectorShape
 		}
 
 		collider.offset = position;
-		collider.radius = radius;
+		collider.radius = radiusX;
 	}
 
 	/// <summary>
@@ -237,35 +256,6 @@ public class CircleShape : VectorShape
 	/// </summary>
 	public override void WriteToXML(XmlWriter writer, Vector2 origin, float scale)
 	{
-		Vector2 svgPosition = (position - origin) * new Vector2(scale, -scale);
-
-		writer.WriteStartElement("circle");
-
-		writer.WriteStartAttribute("cx");
-		writer.WriteValue(svgPosition.x);
-		writer.WriteEndAttribute();
-
-		writer.WriteStartAttribute("cy");
-		writer.WriteValue(svgPosition.y);
-		writer.WriteEndAttribute();
-
-		writer.WriteStartAttribute("r");
-		writer.WriteValue(radius * scale);
-		writer.WriteEndAttribute();
-
-		writer.WriteStartAttribute("stroke");
-		writer.WriteValue(VectorShapeSVGExporter.ConvertColor(colorOutline));
-		writer.WriteEndAttribute();
-
-		writer.WriteStartAttribute("stroke-width");
-		writer.WriteValue("0.01");
-		writer.WriteEndAttribute();
-
-		writer.WriteStartAttribute("fill");
-		writer.WriteValue(VectorShapeSVGExporter.ConvertColor(colorFill));
-		writer.WriteEndAttribute();
-
-		writer.WriteEndElement();
 	}
 
 #if UNITY_EDITOR

@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Xml;
 using UnityEngine;
 #if UNITY_EDITOR
 using UnityEditor;
@@ -208,11 +209,11 @@ public class PolyShape : VectorShape
 
 			if (vertices[i].segmentCurves)
 			{
-				segDist = DistancePointToBezierCurve(pt, vert.position, vert.exitCP, vertNext.enterCP, vertNext.position);
+				segDist = VectorShapeUtils.DistancePointToBezierCurve(pt, vert.position, vert.exitCP, vertNext.enterCP, vertNext.position);
 			}
 			else
 			{
-				segDist = DistancePointToLineSegment(pt, vert.position, vertNext.position);
+				segDist = VectorShapeUtils.DistancePointToLineSegment(pt, vert.position, vertNext.position);
 			}
 
 			if (segDist < distance)
@@ -359,19 +360,49 @@ public class PolyShape : VectorShape
 			}
 		}
 
-		SceneNode polyNode = new SceneNode()
+		shapeNode = new SceneNode()
 		{
-			Transform = Matrix2D.identity,
+			Transform = matrixTransform,
 			Shapes = new List<Shape>
 			{
 				shape
 			}
 		};
 
-		tessellationScene.Root = polyNode;
+		tessellationScene.Root = shapeNode;
 
 		shapeGeometry = VectorUtils.TessellateScene(tessellationScene, tessellationOptions);
 		shapeDirty = false;
+	}
+
+	/// <summary>
+	/// Build a 2D bounding box for the shape.
+	/// </summary>
+	protected override void GenerateBounds()
+	{
+		int bezierSteps = VectorShapeUtils.bezierSteps;
+		List<Vector2> pointList = new List<Vector2>();
+		float step = 1f / bezierSteps;
+
+		for (int i = 0; i < vertices.Length; i++)
+		{
+			Vertex vert = vertices[i];
+
+			pointList.Add(vert.position);
+			if (vert.segmentCurves)
+			{
+				Vertex vertNext = vertices[NextIndex(i)];
+				float t = step;
+				for (int j = 1; j < bezierSteps; j++)
+				{
+					pointList.Add(VectorShapeUtils.EvaluateCubicCurve(vert.position, vert.exitCP, vertNext.enterCP, vertNext.position, t));
+					t += step;
+				}
+			}
+		}
+
+		shapeBounds = VectorUtils.Bounds(pointList);
+		boundsDirty = false;
 	}
 
 	/// <summary>
@@ -429,6 +460,7 @@ public class PolyShape : VectorShape
 			}
 		}
 
+		int bezierSteps = VectorShapeUtils.bezierSteps;
 		List<Vector2> pointList = new List<Vector2>();
 		float step = 1f / bezierSteps;
 
@@ -444,7 +476,7 @@ public class PolyShape : VectorShape
 				float t = step;
 				for (int j = 1; j < bezierSteps; j++)
 				{
-					pointList.Add(EvaluateCubicCurve(vert.position, vert.exitCP, vertNext.enterCP, vertNext.position, t));
+					pointList.Add(VectorShapeUtils.EvaluateCubicCurve(vert.position, vert.exitCP, vertNext.enterCP, vertNext.position, t));
 					t += step;
 				}
 			}
@@ -461,37 +493,92 @@ public class PolyShape : VectorShape
 	}
 
 	/// <summary>
-	/// Build a 2D bounding box for the shape.
+	/// Serialize the shape to an XML writer.
 	/// </summary>
-	protected override void GenerateBounds()
+	public override void WriteToXML(XmlWriter writer, Vector2 origin, float scale)
 	{
-		List<Vector2> pointList = new List<Vector2>();
-		float step = 1f / bezierSteps;
+		writer.WriteStartElement("path");
 
-		for (int i = 0; i < vertices.Length; i++)
+		writer.WriteStartAttribute("stroke");
+		writer.WriteValue(VectorShapeSVGExporter.ConvertColor(colorOutline));
+		writer.WriteEndAttribute();
+
+		writer.WriteStartAttribute("stroke-width");
+		writer.WriteValue("0.01");
+		writer.WriteEndAttribute();
+
+		writer.WriteStartAttribute("fill");
+		writer.WriteValue(VectorShapeSVGExporter.ConvertColor(colorFill));
+		writer.WriteEndAttribute();
+
+		writer.WriteStartAttribute("d");
+		if (vertices.Length > 1)
 		{
-			Vertex vert = vertices[i];
+			Vertex vert = vertices[0];
+			writer.WriteValue("M ");
+			writer.WriteValue(vert.position.x);
+			writer.WriteValue(" ");
+			writer.WriteValue(-vert.position.y);
 
-			pointList.Add(vert.position);
-			if (vert.segmentCurves)
+			for (int i = 1; i < vertices.Length; i++)
 			{
-				Vertex vertNext = vertices[NextIndex(i)];
-				float t = step;
-				for (int j = 1; j < bezierSteps; j++)
+				Vertex vertNext = vertices[i];
+
+				if (vert.segmentCurves)
 				{
-					pointList.Add(EvaluateCubicCurve(vert.position, vert.exitCP, vertNext.enterCP, vertNext.position, t));
-					t += step;
+					writer.WriteValue(" C ");
+					writer.WriteValue(vert.exitCP.x);
+					writer.WriteValue(" ");
+					writer.WriteValue(-vert.exitCP.y);
+					writer.WriteValue(" ");
+					writer.WriteValue(vertNext.enterCP.x);
+					writer.WriteValue(" ");
+					writer.WriteValue(-vertNext.enterCP.y);
+					writer.WriteValue(" ");
+					writer.WriteValue(vertNext.position.x);
+					writer.WriteValue(" ");
+					writer.WriteValue(-vertNext.position.y);
 				}
+				else
+				{
+					writer.WriteValue(" L ");
+					writer.WriteValue(vertNext.position.x);
+					writer.WriteValue(" ");
+					writer.WriteValue(-vertNext.position.y);
+				}
+
+				vert = vertNext;
+			}
+
+			if (closed)
+			{
+				if (vert.segmentCurves)
+				{
+					Vertex vertNext = vertices[0];
+					writer.WriteValue(" C ");
+					writer.WriteValue(vert.exitCP.x);
+					writer.WriteValue(" ");
+					writer.WriteValue(-vert.exitCP.y);
+					writer.WriteValue(" ");
+					writer.WriteValue(vertNext.enterCP.x);
+					writer.WriteValue(" ");
+					writer.WriteValue(-vertNext.enterCP.y);
+					writer.WriteValue(" ");
+					writer.WriteValue(vertNext.position.x);
+					writer.WriteValue(" ");
+					writer.WriteValue(-vertNext.position.y);
+				}
+				writer.WriteValue(" Z");
 			}
 		}
+		writer.WriteEndAttribute();
 
-		shapeBounds = VectorUtils.Bounds(pointList);
-		boundsDirty = false;
-	}
+		writer.WriteEndElement();
+}
 
 #if UNITY_EDITOR
 	/// <summary>
-	/// Draw the point to the active camera using editor handles.
+	/// Draw the shape to the active camera using editor handles.
 	/// </summary>
 	/// <param name="selected">Is the shape selected?</param>
 	/// <param name="active">Is it the active shape?</param>

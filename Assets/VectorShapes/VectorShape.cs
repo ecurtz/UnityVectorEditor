@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Xml;
 using UnityEngine;
 using Unity.VectorGraphics;
 
@@ -12,7 +13,7 @@ public abstract class VectorShape
 	/// <summary>
 	/// Pen size for drawing.
 	/// </summary>
-	static public float penSize = 8f;
+	public static float penSize = 8f;
 
 	/// <summary>
 	/// Outline color.
@@ -29,6 +30,51 @@ public abstract class VectorShape
 	/// </summary>
 	protected string guid = System.Guid.NewGuid().ToString();
 
+	/// <summary>
+	/// Transform matrix.
+	/// </summary>
+	protected Matrix2D matrixTransform = Matrix2D.identity;
+
+	/// <summary>
+	/// Inverse of transform matrix.
+	/// </summary>
+	protected Matrix2D matrixInverse = Matrix2D.identity;
+
+	/// <summary>
+	/// Geometry data generated for shape.
+	/// </summary>
+	protected List<VectorUtils.Geometry> shapeGeometry = null;
+
+	/// <summary>
+	/// Scene data generated for shape.
+	/// </summary>
+	protected SceneNode shapeNode = null;
+
+	/// <summary>
+	/// Mesh generated for tesselated shape.
+	/// </summary>
+	protected Mesh shapeMesh = null;
+
+	/// <summary>
+	/// Bounds rectangle for shape (may be approximate for some shapes).
+	/// </summary>
+	protected Rect shapeBounds = Rect.zero;
+
+	protected bool shapeDirty = true;
+	protected bool inverseDirty = false;
+	protected bool boundsDirty = true;
+
+	/// <summary>
+	/// Level To which the shape selected.
+	/// </summary>
+	public enum SelectionLevel
+	{
+		None,
+		Shape,
+		Component,
+		Vertex
+	}
+
 #if UNITY_EDITOR
 	/// <summary>
 	/// Shared texture for drawing AA lines in the editor.
@@ -39,6 +85,16 @@ public abstract class VectorShape
 	/// Scale for drawing handles in the editor.
 	/// </summary>
 	public static float handleDrawSize = 0f;
+
+	/// <summary>
+	/// Color of a vertex handle
+	/// </summary>
+	public static Color vertexHandleColor = Color.red;
+
+	/// <summary>
+	/// Color of a control handle
+	/// </summary>
+	public static Color controlHandleColor = Color.red;
 #endif
 
 	/// <summary>
@@ -57,6 +113,7 @@ public abstract class VectorShape
 		handleDrawTexture = new Texture2D(1, 2);
 		handleDrawTexture.SetPixel(0, 0, Color.white);
 		handleDrawTexture.SetPixel(0, 1, Color.clear);
+		handleDrawTexture.Apply();
 #endif
 		tessellationScene = new Scene();
 
@@ -68,13 +125,6 @@ public abstract class VectorShape
 			SamplingStepSize = 0.01f
 		};
 	}
-
-	public List<VectorUtils.Geometry> shapeGeometry = null;
-	protected Mesh shapeMesh = null;
-	protected bool shapeDirty = true;
-
-	protected Rect shapeBounds = Rect.zero;
-	protected bool boundsDirty = true;
 
 	/// <summary>
 	/// Mesh built from the tesselated shape.
@@ -136,110 +186,13 @@ public abstract class VectorShape
 				shapeMesh = null;
 				shapeDirty = true;
 				boundsDirty = true;
+				inverseDirty = true;
 			}
 		}
 		get
 		{
-			return (shapeDirty || boundsDirty);
+			return shapeDirty;
 		}
-	}
-
-	/// <summary>
-	/// Point on a quadratic curve between pt0 and pt2.
-	/// </summary>
-	/// <param name="pt0">Starting point</param>
-	/// <param name="pt1">Control point</param>
-	/// <param name="pt2">Ending point</param>
-	/// <param name="t">Distance along curve</param>
-	public static Vector2 EvaluateQuadraticCurve(Vector2 pt0, Vector2 pt1, Vector2 pt2, float t)
-	{
-		Vector2 p0 = Vector2.Lerp(pt0, pt1, t);
-		Vector2 p1 = Vector2.Lerp(pt1, pt2, t);
-		return Vector2.Lerp(p0, p1, t);
-	}
-
-	/// <summary>
-	/// Point on a cubic curve between pt0 and pt3.
-	/// </summary>
-	/// <param name="pt0">Starting point</param>
-	/// <param name="pt1">Control point</param>
-	/// <param name="pt2">Control point</param>
-	/// <param name="pt3">Ending point</param>
-	/// <param name="t">Distance along curve</param>
-	public static Vector2 EvaluateCubicCurve(Vector2 pt0, Vector2 pt1, Vector2 pt2, Vector2 pt3, float t)
-	{
-		Vector2 p0 = EvaluateQuadraticCurve(pt0, pt1, pt2, t);
-		Vector2 p1 = EvaluateQuadraticCurve(pt1, pt2, pt3, t);
-		return Vector2.Lerp(p0, p1, t);
-	}
-
-	/// <summary>
-	/// Distance between a point and a line segment.
-	/// </summary>
-	/// <param name="pt">Test point</param>
-	/// <param name="segA">Start of line segment</param>
-	/// <param name="segB">End of line segment</param>
-	/// <returns>Distance</returns>
-	public static float DistancePointToLineSegment(Vector2 pt, Vector2 segA, Vector2 segB)
-	{
-		float segLength = (segB - segA).sqrMagnitude;
-		if (segLength < Mathf.Epsilon) // Segment is actually a point
-			return (pt - segA).magnitude;
-		
-		float t = Vector2.Dot(pt - segA, segB - segA) / segLength;
-		if (t < 0.0) // Beyond the 'a' end of the segment
-			return (pt - segA).magnitude;
-		if (t > 1.0) // Beyond the 'b' end of the segment
-			return (pt - segB).magnitude;
-
-		// Projection falls on the segment
-		Vector2 projection = segA + t * (segB - segA);
-		return (pt - projection).magnitude;
-	}
-
-	/// <summary>
-	/// Number of steps when approximating Bezier curves.
-	/// </summary>
-	public static int bezierSteps = 12;
-
-#if UNITY_EDITOR
-	/// <summary>
-	/// Color of a vertex handle
-	/// </summary>
-	public static Color vertexHandleColor = Color.red;
-
-	/// <summary>
-	/// Color of a control handle
-	/// </summary>
-	public static Color controlHandleColor = Color.red;
-#endif
-
-	/// <summary>
-	/// Distance between a point and a Bezier curve
-	/// </summary>
-	/// <param name="pt">Test point</param>
-	/// <param name="curveA">Start of curve</param>
-	/// <param name="controlA">Control point A</param>
-	/// <param name="controlB">Control point B</param>
-	/// <param name="curveB">End of curve</param>
-	/// <returns>Distance (approximate)</returns>
-	public static float DistancePointToBezierCurve(Vector2 pt, Vector2 curveA, Vector2 controlA, Vector2 controlB, Vector2 curveB)
-	{
-		float sqrDistance = (pt - curveA).sqrMagnitude;
-
-		float step = 1f / bezierSteps;
-		float t = step;
-		for (int i = 1; i < bezierSteps; i++)
-		{
-			Vector2 curvePt = EvaluateCubicCurve(curveA, controlA, controlB, curveB, t);
-			float sqrDistance2 = (pt - curvePt).sqrMagnitude;
-			if (sqrDistance2 < sqrDistance)
-				sqrDistance = sqrDistance2;
-
-			t += step;
-		}
-
-		return Mathf.Sqrt(sqrDistance);
 	}
 
 	/// <summary>
@@ -309,6 +262,11 @@ public abstract class VectorShape
 	/// Add a 2D collider for the shape to a game object.
 	/// </summary>
 	protected abstract void AddColliderToGO(GameObject target);
+
+	/// <summary>
+	/// Serialize the shape to an XML writer.
+	/// </summary>
+	public abstract void WriteToXML(XmlWriter writer, Vector2 origin, float scale);
 
 #if UNITY_EDITOR
 	/// <summary>

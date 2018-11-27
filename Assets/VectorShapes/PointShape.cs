@@ -1,5 +1,5 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.Xml;
 using UnityEngine;
 #if UNITY_EDITOR
 using UnityEditor;
@@ -12,11 +12,10 @@ using Unity.VectorGraphics;
 /// </summary>
 public class PointShape : VectorShape
 {
-
 	/// <summary>
-	/// Visual size of points.
+	/// Visual size of point.
 	/// </summary>
-	public static float pointRadius = 0.1f;
+	public float pointRadius = 0.1f;
 
 	/// <summary>
 	/// Position of point.
@@ -132,7 +131,7 @@ public class PointShape : VectorShape
 			}
 		};
 
-		Shape path1 = new Shape()
+		Shape segment1 = new Shape()
 		{
 			Contours = new BezierContour[]
 			{
@@ -141,7 +140,7 @@ public class PointShape : VectorShape
 			PathProps = pathProps
 		};
 
-		Shape path2 = new Shape()
+		Shape segment2 = new Shape()
 		{
 			Contours = new BezierContour[]
 			{
@@ -150,19 +149,32 @@ public class PointShape : VectorShape
 			PathProps = pathProps
 		};
 
-		SceneNode markNode = new SceneNode()
+		Shape circle = new Shape();
+		VectorUtils.MakeCircleShape(circle, position, pointRadius);
+		circle.PathProps = pathProps;
+
+		shapeNode = new SceneNode()
 		{
-			Transform = Matrix2D.identity,
+			Transform = matrixTransform,
 			Shapes = new List<Shape>
 			{
-				path1, path2
+				segment1, segment2, circle
 			}
 		};
 
-		tessellationScene.Root = markNode;
+		tessellationScene.Root = shapeNode;
 
 		shapeGeometry = VectorUtils.TessellateScene(tessellationScene, tessellationOptions);
 		shapeDirty = false;
+	}
+
+	/// <summary>
+	/// Build a 2D bounding box for the shape.
+	/// </summary>
+	protected override void GenerateBounds()
+	{
+		shapeBounds = new Rect(position, Vector2.zero);
+		boundsDirty = false;
 	}
 
 	/// <summary>
@@ -192,12 +204,10 @@ public class PointShape : VectorShape
 	}
 
 	/// <summary>
-	/// Build a 2D bounding box for the shape.
+	/// Serialize the shape to an XML writer.
 	/// </summary>
-	protected override void GenerateBounds()
+	public override void WriteToXML(XmlWriter writer, Vector2 origin, float scale)
 	{
-		shapeBounds = new Rect(position, Vector2.zero);
-		boundsDirty = false;
 	}
 
 #if UNITY_EDITOR
