@@ -13,8 +13,8 @@ using Unity.VectorGraphics;
 public class EllipseShape : VectorShape
 {
 	protected Vector2 position;
-	protected float radiusX = 0f;
-	protected float radiusY = 0f;
+	protected Vector2 majorAxis;
+	protected float eccentricity;
 
 	/// <summary>
 	/// Position of center.
@@ -33,48 +33,77 @@ public class EllipseShape : VectorShape
 	}
 
 	/// <summary>
-	/// Radius of ellipse on X axis.
+	/// Eccentricty of ellipse (ratio of focuss distance to major axis).
 	/// </summary>
-	public float RadiusX
+	public float Eccentricity
 	{
 		set
 		{
-			radiusX = value;
-			Dirty = true;
+			if ((eccentricity >= 0f) && (eccentricity < 1f))
+			{
+				eccentricity = value;
+				Dirty = true;
+			}
+			else
+			{
+				Debug.LogWarning("Invalid value for eccentricity: " + value);
+			}
 		}
 		get
 		{
-			return radiusX;
+			return eccentricity;
 		}
 	}
 
 	/// <summary>
-	/// Radius of ellipse on Y axis.
+	/// Major axis of the ellipse.
 	/// </summary>
-	public float RadiusY
+	public Vector2 MajorAxis
 	{
 		set
 		{
-			radiusY = value;
+			majorAxis = value;
 			Dirty = true;
 		}
 		get
 		{
-			return radiusY;
+			return majorAxis;
 		}
 	}
 
 	/// <summary>
-	/// New ellipse from center point and radii.
+	/// Minor axis of the ellipse (read only).
+	/// </summary>
+	public Vector2 MinorAxis
+	{
+		get
+		{
+			Vector2 minorAxis = Vector2.Perpendicular(majorAxis) * Mathf.Sqrt(1f - (eccentricity * eccentricity));
+			return minorAxis;
+		}
+	}
+
+	/// <summary>
+	/// New ellipse from center point and axis radii.
 	/// </summary>
 	/// <param name="center">Center of circle</param>
 	/// <param name="radX">Radius of ellipse on X axis</param>
 	/// <param name="radY">Radius of ellipse on Y axis</param>
-	public EllipseShape(Vector2 center, float radX, float radY)
+	public EllipseShape(Vector2 center, float radX, float radY, float rotation = 0f)
 	{
 		position = center;
-		radiusX = radX;
-		radiusY = radY;
+		if (radX >= radY)
+		{
+			majorAxis = Vector2.right * radX;
+			eccentricity = Mathf.Sin(Mathf.Atan2(radX, radY));
+		}
+		else
+		{
+			majorAxis = Vector2.up * radY;
+			eccentricity = Mathf.Sin(Mathf.Atan2(radY, radX));
+		}
+
+		majorAxis = Matrix2D.Rotate(rotation).MultiplyVector(majorAxis);
 	}
 
 	/// <summary>
@@ -84,7 +113,13 @@ public class EllipseShape : VectorShape
 	/// <returns>Distance from point to nearest point on shape</returns>
 	public override float Distance(Vector2 pt)
 	{
-		return Mathf.Abs(Vector2.Distance(pt, position) - radiusX);
+		Vector2 focus1 = position + majorAxis * eccentricity;
+		Vector2 focus2 = position - majorAxis * eccentricity;
+
+		float distance1 = Vector2.Distance(pt, focus1);
+		float distance2 = Vector2.Distance(pt, focus2);
+		// HACK - this is not correct
+		return ((distance1 + distance2) - (majorAxis.magnitude * 2f));
 	}
 
 	/// <summary>
@@ -94,7 +129,12 @@ public class EllipseShape : VectorShape
 	/// <returns>Is the point inside the shape?</returns>
 	public override bool Contains(Vector2 pt)
 	{
-		return (Vector2.Distance(pt, position) < radiusX);
+		Vector2 focus1 = position + majorAxis * eccentricity;
+		Vector2 focus2 = position - majorAxis * eccentricity;
+
+		float distance1 = Vector2.Distance(pt, focus1);
+		float distance2 = Vector2.Distance(pt, focus2);
+		return ((distance1 + distance2) < (majorAxis.magnitude * 2f));
 	}
 
 	/// <summary>
@@ -104,19 +144,12 @@ public class EllipseShape : VectorShape
 	/// <returns>Is the shape entirely inside the rectangle?</returns>
 	public override bool IsInside(Rect rect)
 	{
-		if (!rect.Contains(position)) return false;
+		if (boundsDirty) GenerateBounds();
 
-		Vector2 testPt = position;
-		testPt.x = position.x - radiusX;
-		if (!rect.Contains(testPt)) return false;
-		testPt.x = position.x + radiusX;
-		if (!rect.Contains(testPt)) return false;
-
-		testPt = position;
-		testPt.y = position.y - radiusY;
-		if (!rect.Contains(testPt)) return false;
-		testPt.y = position.y + radiusY;
-		if (!rect.Contains(testPt)) return false;
+		if (rect.xMin > shapeBounds.xMin) return false;
+		if (rect.xMax < shapeBounds.xMax) return false;
+		if (rect.yMin > shapeBounds.yMin) return false;
+		if (rect.yMax < shapeBounds.yMax) return false;
 
 		return true;
 	}
@@ -130,6 +163,7 @@ public class EllipseShape : VectorShape
 	{
 		Matrix2D matrix = Matrix2D.Translate(center) * Matrix2D.Rotate(angle * Mathf.Deg2Rad) * Matrix2D.Translate(-center);
 		position = matrix.MultiplyPoint(position);
+		majorAxis = matrix.MultiplyVector(majorAxis);
 
 		Dirty = true;
 	}
@@ -151,25 +185,8 @@ public class EllipseShape : VectorShape
 	/// <param name="matrix">Matrix to transform shape</param>
 	public override void TransformBy(Matrix2D matrix)
 	{
-		// Attempt to identify uniform scaling
-		Vector2 pt0 = matrix.MultiplyPoint(position + new Vector2(0, radiusY));
-		Vector2 pt1 = matrix.MultiplyPoint(position + new Vector2(0, -radiusY));
-		Vector2 pt2 = matrix.MultiplyPoint(position + new Vector2(radiusX, 0));
-		Vector2 pt3 = matrix.MultiplyPoint(position + new Vector2(-radiusX, 0));
-
 		position = matrix.MultiplyPoint(position);
-
-		float distSqr = Vector2.SqrMagnitude(pt0 - position);
-		if (Mathf.Approximately(distSqr, Vector2.SqrMagnitude(pt1 - position)) &&
-		    Mathf.Approximately(distSqr, Vector2.SqrMagnitude(pt2 - position)) &&
-		    Mathf.Approximately(distSqr, Vector2.SqrMagnitude(pt3 - position)))
-		{
-			radiusX = Mathf.Sqrt(distSqr);
-		}
-		else
-		{
-			Debug.LogWarning("Ignored matrix change that would destroy ellipse.");
-		}
+		majorAxis = matrix.MultiplyVector(majorAxis);
 
 		Dirty = true;
 	}
@@ -182,7 +199,8 @@ public class EllipseShape : VectorShape
 		if ((shapeGeometry != null) && (!shapeDirty)) return;
 
 		Shape ellipse = new Shape();
-		VectorUtils.MakeEllipseShape(ellipse, position, radiusX, radiusY);
+		float rotation = Mathf.Atan2(MajorAxis.y, MajorAxis.x);
+		VectorUtils.MakeEllipseShape(ellipse, Vector2.zero, MajorAxis.magnitude, MinorAxis.magnitude);
 
 		ellipse.PathProps = new PathProperties()
 		{
@@ -202,7 +220,7 @@ public class EllipseShape : VectorShape
 
 		shapeNode = new SceneNode()
 		{
-			Transform = matrixTransform,
+			Transform = matrixTransform * Matrix2D.Translate(position) * Matrix2D.Rotate(rotation),
 			Shapes = new List<Shape>
 			{
 				ellipse
@@ -221,7 +239,20 @@ public class EllipseShape : VectorShape
 	/// </summary>
 	protected override void GenerateBounds()
 	{
-		shapeBounds = new Rect(position - new Vector2(radiusX, radiusY), new Vector2(radiusX * 2, radiusY * 2));
+		float a = MajorAxis.magnitude;
+		float b = MinorAxis.magnitude;
+		float theta = Mathf.Atan2(MajorAxis.y, MajorAxis.x);
+
+		float sinTheta = Mathf.Sin(theta);
+		float cosTheta = Mathf.Cos(theta);
+		float extentX = Mathf.Sqrt((a * a * cosTheta * cosTheta) + (b * b * sinTheta * sinTheta));
+		float extentY = Mathf.Sqrt((a * a * sinTheta * sinTheta) + (b * b * cosTheta * cosTheta));
+
+		shapeBounds.xMin = position.x - extentX;
+		shapeBounds.xMax = position.x + extentX;
+		shapeBounds.yMin = position.y - extentY;
+		shapeBounds.yMax = position.y + extentY;
+
 		boundsDirty = false;
 	}
 
@@ -241,6 +272,7 @@ public class EllipseShape : VectorShape
 			}
 		}
 
+		// HACK - this is REALLY wrong
 		if (collider == null)
 		{
 			collider = collider.gameObject.AddComponent<CircleCollider2D>();
@@ -248,7 +280,7 @@ public class EllipseShape : VectorShape
 		}
 
 		collider.offset = position;
-		collider.radius = radiusX;
+		collider.radius = majorAxis.magnitude;
 	}
 
 	/// <summary>

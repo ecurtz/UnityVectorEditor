@@ -254,7 +254,7 @@ public class CircleShape : VectorShape
 		writer.WriteEndAttribute();
 
 		writer.WriteStartAttribute("stroke");
-		writer.WriteValue(VectorShapeSVGExporter.ConvertColor(colorOutline));
+		writer.WriteValue(VectorShapeFilesSVG.ConvertColor(colorOutline));
 		writer.WriteEndAttribute();
 
 		writer.WriteStartAttribute("stroke-width");
@@ -262,7 +262,7 @@ public class CircleShape : VectorShape
 		writer.WriteEndAttribute();
 
 		writer.WriteStartAttribute("fill");
-		writer.WriteValue(VectorShapeSVGExporter.ConvertColor(colorFill));
+		writer.WriteValue(VectorShapeFilesSVG.ConvertColor(colorFill));
 		writer.WriteEndAttribute();
 
 		writer.WriteEndElement();
@@ -276,63 +276,11 @@ public class CircleShape : VectorShape
 	/// <param name="active">Is it the active shape?</param>
 	public override void DrawEditorHandles(bool selected, bool active = false)
 	{
-		/*
-		Vector3 handleP0 = new Vector3();
-		Vector3 handleP1 = new Vector3();
-		Vector3 handleP2 = new Vector3();	
-		Vector3 handleP3 = new Vector3();
-
-		if (colorFill != Color.clear)
+		if (selected)
 		{
-			Color colorPrev = Handles.color;
-			Vector3 center3 = new Vector3(position.x, position.y, 0);
-
-			Handles.color = colorFill;
-			Handles.DrawSolidDisc(center3, Vector3.forward, radius);
-			Handles.color = colorPrev;
+			if (boundsDirty) GenerateBounds();
+			Handles.DrawSolidRectangleWithOutline(shapeBounds, Color.clear, Handles.color);
 		}
-
-		// Draw the circle using 4 Bezier curves so we can control the pen size
-		handleP0.x = position.x;
-		handleP0.y = position.y + radius;
-		handleP1.x = position.x + radius * bezierCircleConst;
-		handleP1.y = position.y + radius;
-		handleP2.x = position.x + radius;
-		handleP2.y = position.y + radius * bezierCircleConst;
-		handleP3.x = position.x + radius;
-		handleP3.y = position.y;
-		Handles.DrawBezier(handleP0, handleP3, handleP1, handleP2, colorOutline, handleDrawTexture, penSize);
-
-		handleP0.x = position.x + radius;
-		handleP0.y = position.y;
-		handleP1.x = position.x + radius;
-		handleP1.y = position.y - radius * bezierCircleConst;
-		handleP2.x = position.x + radius * bezierCircleConst;
-		handleP2.y = position.y - radius;
-		handleP3.x = position.x;
-		handleP3.y = position.y - radius;
-		Handles.DrawBezier(handleP0, handleP3, handleP1, handleP2, colorOutline, handleDrawTexture, penSize);
-
-		handleP0.x = position.x;
-		handleP0.y = position.y - radius;
-		handleP1.x = position.x - radius * bezierCircleConst;
-		handleP1.y = position.y - radius;
-		handleP2.x = position.x - radius;
-		handleP2.y = position.y - radius * bezierCircleConst;
-		handleP3.x = position.x - radius;
-		handleP3.y = position.y;
-		Handles.DrawBezier(handleP0, handleP3, handleP1, handleP2, colorOutline, handleDrawTexture, penSize);
-
-		handleP0.x = position.x - radius;
-		handleP0.y = position.y;
-		handleP1.x = position.x - radius;
-		handleP1.y = position.y + radius * bezierCircleConst;
-		handleP2.x = position.x - radius * bezierCircleConst;
-		handleP2.y = position.y + radius;
-		handleP3.x = position.x;
-		handleP3.y = position.y + radius;
-		Handles.DrawBezier(handleP0, handleP3, handleP1, handleP2, colorOutline, handleDrawTexture, penSize);
-		*/
 
 		if (active)
 		{

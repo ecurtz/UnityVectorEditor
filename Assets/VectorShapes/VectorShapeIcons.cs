@@ -190,6 +190,22 @@ public static class VectorShapeIcons
 		"<path d = \"M11,13.5V21.5H3V13.5H11M12,2L17.5,11H6.5L12,2M17.5,13C20,13 22,15 22,17.5C22,20 20,22 17.5,22C15,22 13,20 13,17.5C13,15 15,13 17.5,13Z\"/>" +
 		svgIconFooter;
 
+	// Selection levels
+	public static string iconSelectObject =
+		svgIconHeader +
+		"<path d = \"M2,2H8V4H16V2H22V8H20V16H22V22H16V20H8V22H2V16H4V8H2V2M16,8V6H8V8H6V16H8V18H16V16H18V8H16M4,4V6H6V4H4M18,4V6H20V4H18M4,18V20H6V18H4M18,18V20H20V18H18Z\"/>" +
+		svgIconFooter;
+	
+	public static string iconSelectSegment =
+		svgIconHeader +
+		"<path d = \"M2,4H4V2H10V4A10,10 0 0,1 20,14H22V20H20V22H18V20H16V14H18A8,8 0 0,0 10,6V8H4V6H2V4M18,16V18H20V16H18M6,4V6H8V4H6Z\"/>" +
+		svgIconFooter;
+	
+	public static string iconSelectVertex =
+		svgIconHeader +
+		"<path d = \"M12,20L7,22L12,11L17,22L12,20M8,2H16V5H22V7H16V10H8V7H2V5H8V2M10,4V8H14V4H10Z\"/>" +
+		svgIconFooter;
+
 	// Simple shapes
 	public static string iconPoint =
 		svgIconHeader +
@@ -200,7 +216,12 @@ public static class VectorShapeIcons
 		svgIconHeader +
 		"<path d = \"M12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z\"/>" +
 		svgIconFooter;
-	
+
+	public static string iconFilledCircle =
+		svgIconHeader +
+		"<path d = \"M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z\"/>" +
+		svgIconFooter;
+
 	public static string iconTriangle =
 		svgIconHeader +
 		"<path d = \"M12,2L1,21H23M12,6L19.53,19H4.47\"/>" +
@@ -219,11 +240,6 @@ public static class VectorShapeIcons
 	public static string iconHexagon =
 		svgIconHeader +
 		"<path d = \"M21,16.5C21,16.88 20.79,17.21 20.47,17.38L12.57,21.82C12.41,21.94 12.21,22 12,22C11.79,22 11.59,21.94 11.43,21.82L3.53,17.38C3.21,17.21 3,16.88 3,16.5V7.5C3,7.12 3.21,6.79 3.53,6.62L11.43,2.18C11.59,2.06 11.79,2 12,2C12.21,2 12.41,2.06 12.57,2.18L20.47,6.62C20.79,6.79 21,7.12 21,7.5V16.5M12,4.15L5,8.09V15.91L12,19.85L19,15.91V8.09L12,4.15Z\"/>" +
-		svgIconFooter;
-
-	public static string iconOctagon =
-		svgIconHeader +
-		"<path d = \"M8.27,3L3,8.27V15.73L8.27,21H15.73C17.5,19.24 21,15.73 21,15.73V8.27L15.73,3M9.1,5H14.9L19,9.1V14.9L14.9,19H9.1L5,14.9V9.1\"/>" +
 		svgIconFooter;
 
 	public static string iconPolygon =

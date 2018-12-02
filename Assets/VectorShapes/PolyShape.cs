@@ -104,6 +104,36 @@ public class PolyShape : VectorShape
 	}
 
 	/// <summary>
+	/// New shape from a rectangle.
+	/// </summary>
+	/// <param name="rectangle">Rectangle</param>
+	public PolyShape(Rect rectangle)
+	{
+		int vertexCount = 4;
+		vertices = new Vertex[vertexCount];
+		for (int i = 0; i < vertexCount; i++)
+		{
+			vertices[i] = new Vertex();
+		}
+
+		vertices[0].position.x = rectangle.xMin;
+		vertices[0].position.y = rectangle.yMin;
+		vertices[1].position.x = rectangle.xMax;
+		vertices[1].position.y = rectangle.yMin;
+		vertices[2].position.x = rectangle.xMax;
+		vertices[2].position.y = rectangle.yMax;
+		vertices[3].position.x = rectangle.xMin;
+		vertices[3].position.y = rectangle.yMax;
+
+		closed = true;
+
+		for (int i = 0; i < vertexCount; i++)
+		{
+			InitializeControlPoints(i);
+		}
+	}
+
+	/// <summary>
 	/// New shape from array of points.
 	/// </summary>
 	/// <param name="points">Array of vertex positions</param>
@@ -128,6 +158,67 @@ public class PolyShape : VectorShape
 		if (points[0] != points[points.Length - 1])
 		{
 			closed = false;
+		}
+	}
+
+	/// <summary>
+	/// New PolyShape from Unity contour data.
+	/// </summary>
+	public PolyShape(BezierContour contour)
+	{
+		int vertexCount = contour.Segments.Length;
+		vertices = new Vertex[vertexCount];
+
+		for (int i = 0; i < vertexCount; i++)
+		{
+			vertices[i] = new Vertex();
+		}
+		for (int i = 0; i < vertexCount; i++)
+		{
+			BezierPathSegment segment = contour.Segments[i];
+			vertices[i].position = segment.P0;
+			vertices[i].exitCP = segment.P1;
+			vertices[NextIndex(i)].enterCP = segment.P2;
+			vertices[i].segmentCurves = true;
+		}
+
+		closed = contour.Closed;
+	}
+
+
+	/// <summary>
+	/// New PolyShape from Unity shape data.
+	/// </summary>
+	public PolyShape(Shape shape, Matrix2D shapeTransform)
+	{
+		int vertexCount = 0;
+		foreach (BezierContour contour in shape.Contours)
+		{
+			vertexCount += contour.Segments.Length;
+		}
+		vertices = new Vertex[vertexCount];
+		for (int i = 0; i < vertexCount; i++)
+		{
+			vertices[i] = new Vertex();
+		}
+
+		foreach (BezierContour contour in shape.Contours)
+		{
+			for (int i = 0; i < contour.Segments.Length; i++)
+			{
+				BezierPathSegment segment = contour.Segments[i];
+				vertices[i].position = shapeTransform.MultiplyPoint(segment.P0);
+				vertices[i].exitCP = shapeTransform.MultiplyPoint(segment.P1);
+				vertices[NextIndex(i)].enterCP = shapeTransform.MultiplyPoint(segment.P2);
+				vertices[i].segmentCurves = true;
+			}
+
+			closed = contour.Closed;
+		}
+
+		if (shape.PathProps.Stroke != null)
+		{
+			colorOutline = shape.PathProps.Stroke.Color;
 		}
 	}
 
@@ -500,7 +591,7 @@ public class PolyShape : VectorShape
 		writer.WriteStartElement("path");
 
 		writer.WriteStartAttribute("stroke");
-		writer.WriteValue(VectorShapeSVGExporter.ConvertColor(colorOutline));
+		writer.WriteValue(VectorShapeFilesSVG.ConvertColor(colorOutline));
 		writer.WriteEndAttribute();
 
 		writer.WriteStartAttribute("stroke-width");
@@ -508,7 +599,7 @@ public class PolyShape : VectorShape
 		writer.WriteEndAttribute();
 
 		writer.WriteStartAttribute("fill");
-		writer.WriteValue(VectorShapeSVGExporter.ConvertColor(colorFill));
+		writer.WriteValue(VectorShapeFilesSVG.ConvertColor(colorFill));
 		writer.WriteEndAttribute();
 
 		writer.WriteStartAttribute("d");

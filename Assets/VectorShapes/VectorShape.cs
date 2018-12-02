@@ -119,7 +119,7 @@ public abstract class VectorShape
 
 		tessellationOptions = new VectorUtils.TessellationOptions()
 		{
-			StepDistance = 0.05f,
+			StepDistance = 0.01f,
 			MaxCordDeviation = float.MaxValue,
 			MaxTanAngleDeviation = Mathf.PI / 2.0f,
 			SamplingStepSize = 0.01f
