@@ -12,9 +12,35 @@ using Unity.VectorGraphics;
 /// </summary>
 public class EllipseShape : VectorShape
 {
+	/// <summary>
+	/// Position of center.
+	/// </summary>
+	[SerializeField]
 	protected Vector2 position;
+
+	/// <summary>
+	/// Major axis of the ellipse.
+	/// </summary>
+	[SerializeField]
 	protected Vector2 majorAxis;
+
+	/// <summary>
+	/// Eccentricty of ellipse (ratio of focuss distance to major axis).
+	/// </summary>
+	[SerializeField]
 	protected float eccentricity;
+
+	/// <summary>
+	/// Starting angle for elliptical arcs (in radians).
+	/// </summary>
+	[SerializeField]
+	protected float startAngle = 0f;
+
+	/// <summary>
+	/// Sweep angle for elliptical arcs (in radians).
+	/// </summary>
+	[SerializeField]
+	protected float sweepAngle = Mathf.PI * 2f;
 
 	/// <summary>
 	/// Position of center.
@@ -84,11 +110,52 @@ public class EllipseShape : VectorShape
 	}
 
 	/// <summary>
-	/// New ellipse from center point and axis radii.
+	/// Starting angle for elliptical arcs (in degrees).
+	/// </summary>
+	public float StartAngle
+	{
+		set
+		{
+			startAngle = value * Mathf.Deg2Rad;
+			Dirty = true;
+		}
+		get
+		{
+			return startAngle * Mathf.Rad2Deg;
+		}
+	}
+
+	/// <summary>
+	/// Sweep angle for elliptical arcs (in degrees).
+	/// </summary>
+	public float SweepAngle
+	{
+		set
+		{
+			sweepAngle = value * Mathf.Deg2Rad;
+			if (Mathf.Approximately(value, 0f) || (Mathf.Abs(value) >= 360f))
+			{
+				closed = true;
+			}
+			else
+			{
+				closed = false;
+			}
+			Dirty = true;
+		}
+		get
+		{
+			return sweepAngle * Mathf.Rad2Deg;
+		}
+	}
+
+	/// <summary>
+	/// New ellipse from center point and axis radii (SVG format).
 	/// </summary>
 	/// <param name="center">Center of circle</param>
 	/// <param name="radX">Radius of ellipse on X axis</param>
 	/// <param name="radY">Radius of ellipse on Y axis</param>
+	/// <param name="rotation">Rotation from x-axis (in degrees)</param>
 	public EllipseShape(Vector2 center, float radX, float radY, float rotation = 0f)
 	{
 		position = center;
@@ -103,7 +170,53 @@ public class EllipseShape : VectorShape
 			eccentricity = Mathf.Sin(Mathf.Atan2(radY, radX));
 		}
 
-		majorAxis = Matrix2D.Rotate(rotation).MultiplyVector(majorAxis);
+		majorAxis = Matrix2D.Rotate(-rotation * Mathf.Deg2Rad).MultiplyVector(majorAxis);
+	}
+
+	/// <summary>
+	/// New ellipse from center point, major axis, and minor axis ratio (DXF format).
+	/// </summary>
+	/// <param name="center">Center of circle</param>
+	/// <param name="major">Major axis of the ellipse</param>
+	/// <param name="ratio">Ratio of minor axis to major axis</param>
+	public EllipseShape(Vector2 center, Vector2 major, float ratio)
+	{
+		position = center;
+		majorAxis = major;
+		float majorLength = major.magnitude;
+		float minorLength = major.magnitude * ratio;
+
+		eccentricity = Mathf.Sqrt((majorLength * majorLength) - (minorLength * minorLength)) / majorLength;
+	}
+
+	/// <summary>
+	/// New elliptical arc from center point, major axis, minor axis ration, and angles.
+	/// </summary>
+	/// <param name="center">Center of circle</param>
+	/// <param name="major">Major axis of the ellipse</param>
+	/// <param name="ratio">Ratio of minor axis to major axis</param>
+	/// <param name="angle">Starting angle of arc (in degrees)</param>
+	/// <param name="sweep">Sweep of arc (in degrees)</param>
+	public EllipseShape(Vector2 center, Vector2 major, float ratio, float angle, float sweep)
+	{
+		position = center;
+		majorAxis = major;
+		float majorLength = major.magnitude;
+		float minorLength = major.magnitude * ratio;
+
+		eccentricity = Mathf.Sqrt((majorLength * majorLength) - (minorLength * minorLength)) / majorLength;
+
+		startAngle = angle * Mathf.Deg2Rad;
+		sweepAngle = sweep * Mathf.Deg2Rad;
+
+		if (Mathf.Approximately(sweep, 0f) || (Mathf.Abs(sweep) >= 360f))
+		{
+			closed = true;
+		}
+		else
+		{
+			closed = false;
+		}
 	}
 
 	/// <summary>
@@ -199,7 +312,7 @@ public class EllipseShape : VectorShape
 		if ((shapeGeometry != null) && (!shapeDirty)) return;
 
 		Shape ellipse = new Shape();
-		float rotation = Mathf.Atan2(MajorAxis.y, MajorAxis.x);
+		float theta = Mathf.Atan2(MajorAxis.y, MajorAxis.x);
 		VectorUtils.MakeEllipseShape(ellipse, Vector2.zero, MajorAxis.magnitude, MinorAxis.magnitude);
 
 		ellipse.PathProps = new PathProperties()
@@ -218,16 +331,91 @@ public class EllipseShape : VectorShape
 			};
 		}
 
+		int numCurves = 4; // Supposed to calculate from max error
+		BezierSegment[] segments = new BezierSegment[numCurves];
+		float deltaAngle = sweepAngle / numCurves;
+		float sinTheta = Mathf.Sin(theta);
+		float cosTheta = Mathf.Cos(theta);
+		float angleB = startAngle;
+		float a = MajorAxis.magnitude;
+		float b = MinorAxis.magnitude;
+		float t = Mathf.Tan(0.5f * deltaAngle);
+		float alpha = Mathf.Sin(deltaAngle) * (Mathf.Sqrt(4f + 3f * t * t) - 1f) / 3f;
+
+		float sinAngleB = Mathf.Sin(angleB);
+		float cosAngleB = Mathf.Cos(angleB);
+		float aSinAngleB = a * sinAngleB;
+		float aCosAngleB = a * cosAngleB;
+		float bSinAngleB = b * sinAngleB;
+		float bCosAngleB = b * cosAngleB;
+		Vector2 ptB = new Vector2();
+		ptB.x = position.x + aCosAngleB * cosTheta - bSinAngleB * sinTheta;
+		ptB.y =position.y + aCosAngleB * sinTheta + bSinAngleB * cosTheta;
+		Vector2 dotB = new Vector2();
+		dotB.x = -aSinAngleB * cosTheta - bCosAngleB * sinTheta;
+		dotB.y = -aSinAngleB * sinTheta + bCosAngleB * cosTheta;
+
+		for (int i = 0; i < numCurves; ++i)
+		{
+			float angleA = angleB;
+			Vector2 ptA = ptB;
+			Vector2 dotA = dotB;
+
+			angleB += deltaAngle;
+			sinAngleB = Mathf.Sin(angleB);
+			cosAngleB = Mathf.Cos(angleB);
+			aSinAngleB = a * sinAngleB;
+			aCosAngleB = a * cosAngleB;
+			bSinAngleB = b * sinAngleB;
+			bCosAngleB = b * cosAngleB;
+			ptB.x = position.x + aCosAngleB * cosTheta - bSinAngleB * sinTheta;
+			ptB.y = position.y + aCosAngleB * sinTheta + bSinAngleB * cosTheta;
+			dotB.x = -aSinAngleB * cosTheta - bCosAngleB * sinTheta;
+			dotB.y = -aSinAngleB * sinTheta + bCosAngleB * cosTheta;
+
+			segments[i].P0 = ptA;
+			segments[i].P1.x = ptA.x + alpha * dotA.x;
+			segments[i].P1.y = ptA.y + alpha * dotA.y;
+			segments[i].P2.x = ptB.x - alpha * dotB.x;
+			segments[i].P2.y = ptB.y - alpha * dotB.y;
+			segments[i].P3 = ptB;
+		}
+		Shape testShape = new Shape();
+		testShape.PathProps = new PathProperties()
+		{
+			Stroke = new Stroke()
+			{
+				Color = Color.red,
+				HalfThickness = penSize * 1.5f / Screen.dpi
+			}
+		};
+		testShape.Contours = new BezierContour[1];
+		testShape.Contours[0] = new BezierContour();
+		testShape.Contours[0].Segments = VectorUtils.BezierSegmentsToPath(segments);
+
 		shapeNode = new SceneNode()
 		{
-			Transform = matrixTransform * Matrix2D.Translate(position) * Matrix2D.Rotate(rotation),
+			Transform =  Matrix2D.Translate(position) * Matrix2D.Rotate(-theta),
 			Shapes = new List<Shape>
 			{
 				ellipse
 			}
 		};
 
-		tessellationScene.Root = shapeNode;
+		SceneNode testNode = new SceneNode()
+		{
+			Transform = matrixTransform,
+			Shapes = new List<Shape>
+			{
+				testShape
+			},
+			Children = new List<SceneNode>
+			{
+				shapeNode
+			}
+		};
+
+		tessellationScene.Root = testNode;
 		shapeGeometry = VectorUtils.TessellateScene(tessellationScene, tessellationOptions);
 
 		shapeMesh = null;

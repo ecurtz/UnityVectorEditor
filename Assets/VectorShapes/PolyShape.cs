@@ -56,11 +56,6 @@ public class PolyShape : VectorShape
 	/// </summary>
 	public bool continuousCurves = true;
 
-	/// <summary>
-	/// Does the last vertex connect back to the first?
-	/// </summary>
-	public bool closed = true;
-
 #if UNITY_EDITOR
 	/// <summary>
 	/// Scale of a control point handle
@@ -77,6 +72,19 @@ public class PolyShape : VectorShape
 	/// </summary>
 	public Vertex.Component activeComponent = Vertex.Component.None;
 #endif
+
+	/// <summary>
+	/// New polygon start from a single origin point.
+	/// </summary>
+	/// <param name="point">Starting point for polygon</param>
+	public PolyShape(Vector2 point)
+	{
+		vertices = new Vertex[1];
+		vertices[0] = new Vertex();
+		vertices[0].position = point;
+
+		closed = false;
+	}
 
 	/// <summary>
 	/// New regular n-sided polygon at location.
@@ -138,7 +146,7 @@ public class PolyShape : VectorShape
 	/// </summary>
 	/// <param name="points">Array of vertex positions</param>
 	/// <param name="curve">Do the segments curve?</param>
-	public PolyShape(Vector2[] points, bool curve = false)
+	public PolyShape(Vector2[] points, bool curve = false, bool close = false)
 	{
 		int vertexCount = points.Length;
 		vertices = new Vertex[vertexCount];
@@ -155,15 +163,13 @@ public class PolyShape : VectorShape
 			InitializeControlPoints(i);
 		}
 
-		if (points[0] != points[points.Length - 1])
-		{
-			closed = false;
-		}
+		closed = close;
 	}
 
 	/// <summary>
 	/// New PolyShape from Unity contour data.
 	/// </summary>
+	/// <param name="contour">Contour data</param>
 	public PolyShape(BezierContour contour)
 	{
 		int vertexCount = contour.Segments.Length;
@@ -189,6 +195,8 @@ public class PolyShape : VectorShape
 	/// <summary>
 	/// New PolyShape from Unity shape data.
 	/// </summary>
+	/// <param name="shape">Shape data</param>
+	/// <param name="shapeTransform">Transform matrix</param>
 	public PolyShape(Shape shape, Matrix2D shapeTransform)
 	{
 		int vertexCount = 0;
@@ -266,19 +274,136 @@ public class PolyShape : VectorShape
 	}
 
 	/// <summary>
-	/// Add a new vertex onto the shape.
+	/// Add a new line segment onto the shape.
 	/// </summary>
-	/// <param name="pt">New vertex</param>
-	public void AppendVertex(Vector2 pt)
+	/// <param name="pt">New vertex position</param>
+	public void LineTo(Vector2 pt)
 	{
-		int newIndex = vertices.Length;
-		int previousIndex = PreviousIndex(newIndex);
+		if (closed)
+		{
+			Debug.LogWarning("Appending vertices to closed PolyShape.");
+		}
 
-		Vertex newVertex = new Vertex();
-		newVertex.position = pt;
-		List<Vertex> newVertices = new List<Vertex>(vertices);
-		newVertices.Add(newVertex);
-		vertices = newVertices.ToArray();
+		int index = vertices.Length;
+		int prev = PreviousIndex(index);
+		System.Array.Resize(ref vertices, vertices.Length + 1);
+		vertices[index] = new Vertex();
+		vertices[index].position = pt;
+		vertices[index].segmentCurves = false;
+
+		Dirty = true;
+	}
+
+
+	/// <summary>
+	/// Add a new circular arc onto the shape.
+	/// </summary>
+	/// <param name="pt">New vertex position</param>
+	/// <param name="sweep">Sweep of angle connecting point (in degrees)</param>
+	public void ArcTo(Vector2 pt, float sweep)
+	{
+		if (vertices.Length == 0) return;
+		if (Mathf.Approximately(sweep, 0f))
+		{
+			LineTo(pt);
+			return;
+		}
+
+		int index = vertices.Length;
+		int prev = PreviousIndex(index);
+		float sweepRads = sweep * Mathf.Deg2Rad;
+		// I'm not actually sure this is how DXF does it, but it looks right in my test.
+		float sinSweep = Mathf.Sin(sweepRads);
+		float offset = sinSweep * sinSweep * Mathf.Sign(sweep);
+
+		ArcTo(pt, sweepRads, offset);
+	}
+
+	/// <summary>
+	/// Add a new circular arc onto the shape.
+	/// </summary>
+	/// <param name="pt">New vertex position</param>
+	/// <param name="bulge">Amount of bulge in the arc</param>
+	/// <remarks>
+	/// The bulge factor is the tangent of one fourth the included angle for an arc segment,
+	/// made negative if the arc goes clockwise from the start point to the endpoint.
+	/// A bulge of 0 indicates a straight segment, and a bulge of 1 is a semicircle.
+	/// </remarks>
+	public void ArcToDXF(Vector2 pt, float bulge)
+	{
+		if (vertices.Length == 0) return;
+		if (Mathf.Approximately(bulge, 0f))
+		{
+			LineTo(pt);
+			return;
+		}
+
+		float sweepRads = Mathf.Atan(bulge) * 4f;
+		// I'm not actually sure this is how DXF does it, but it looks right in my test.
+		float sinSweep = Mathf.Sin(sweepRads);
+		float offset = sinSweep * sinSweep * Mathf.Sign(bulge);
+
+		ArcTo(pt, sweepRads, offset);
+	}
+
+	/// <summary>
+	/// Internal method to add a new circular arc onto the shape.
+	/// </summary>
+	/// <param name="pt">New vertex position</param>
+	/// <param name="sweepRads">Angle swept (in radians!)</param>
+	/// <param name="offset">Amount arc center if offset from segment</param>
+	protected void ArcTo(Vector2 pt, float sweepRads, float offset)
+	{
+		if (closed)
+		{
+			Debug.LogWarning("Appending vertices to closed PolyShape.");
+		}
+
+		int index = vertices.Length;
+		int prev = PreviousIndex(index);
+
+		Vector2 position = vertices[prev].position;
+		Vector2 segment = pt - position;
+		Vector2 midpoint = Vector2.Lerp(pt, position, 0.5f);
+		Vector2 center = midpoint + Vector2.Perpendicular(segment) * offset;
+		float radius = (position - center).magnitude;
+
+		int arcCount = Mathf.CeilToInt(Mathf.Abs(sweepRads) / (90f * Mathf.Deg2Rad));
+		Vector2[] arcPoints = new Vector2[arcCount];
+		float arcAngle = Mathf.Atan2(position.y - center.y, position.x - center.x);
+		float arcAngle2 = Mathf.Atan2(pt.y - center.y, pt.x - center.x);
+		float arcStep = sweepRads / arcCount;
+		for (int i = 0; i < arcCount; i++)
+		{
+			arcAngle += arcStep;
+			arcPoints[i].x = center.x + radius * Mathf.Cos(arcAngle);
+			arcPoints[i].y = center.y + radius * Mathf.Sin(arcAngle);
+		}
+		arcPoints[arcCount - 1] = pt;
+
+		System.Array.Resize(ref vertices, vertices.Length + arcCount);
+
+		for (int i = 0; i < arcCount; i++)
+		{
+			vertices[prev].segmentCurves = true;
+
+			vertices[index] = new Vertex();
+			vertices[index].position = arcPoints[i];
+
+			Vector2 a = vertices[prev].position - center;
+			Vector2 b = vertices[index].position - center;
+			float q1 = a.sqrMagnitude;
+			float q2 = q1 + a.x * b.x + a.y * b.y;
+			float k2 = 4f / 3f * (Mathf.Sqrt(2f * q1 * q2) - q2) / (a.x * b.y - a.y * b.x);
+
+			vertices[prev].exitCP.x = center.x + a.x - k2 * a.y;
+			vertices[prev].exitCP.y = center.y + a.y + k2 * a.x;
+			vertices[index].enterCP.x = center.x + b.x + k2 * b.y;
+			vertices[index].enterCP.y = center.y + b.y - k2 * b.x;
+
+			prev = index;
+			index++;
+		}
 
 		Dirty = true;
 	}

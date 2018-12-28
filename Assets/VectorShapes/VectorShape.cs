@@ -13,7 +13,7 @@ public abstract class VectorShape
 	/// <summary>
 	/// Pen size for drawing.
 	/// </summary>
-	public static float penSize = 8f;
+	public float penSize = 8f;
 
 	/// <summary>
 	/// Outline color.
@@ -26,19 +26,22 @@ public abstract class VectorShape
 	public Color colorFill = Color.clear;
 
 	/// <summary>
+	/// Does the last vertex connect back to the first?
+	/// </summary>
+	[SerializeField]
+	protected bool closed = true;
+
+	/// <summary>
 	/// ID.
 	/// </summary>
+	[SerializeField]
 	protected string guid = System.Guid.NewGuid().ToString();
 
 	/// <summary>
 	/// Transform matrix.
 	/// </summary>
+	[SerializeField]
 	protected Matrix2D matrixTransform = Matrix2D.identity;
-
-	/// <summary>
-	/// Inverse of transform matrix.
-	/// </summary>
-	protected Matrix2D matrixInverse = Matrix2D.identity;
 
 	/// <summary>
 	/// Geometry data generated for shape.
@@ -119,10 +122,10 @@ public abstract class VectorShape
 
 		tessellationOptions = new VectorUtils.TessellationOptions()
 		{
-			StepDistance = 0.01f,
+			StepDistance = 0.05f,
 			MaxCordDeviation = float.MaxValue,
 			MaxTanAngleDeviation = Mathf.PI / 2.0f,
-			SamplingStepSize = 0.01f
+			SamplingStepSize = 0.05f
 		};
 	}
 
@@ -192,6 +195,36 @@ public abstract class VectorShape
 		get
 		{
 			return shapeDirty;
+		}
+	}
+
+	/// <summary>
+	/// Is the shape closed?
+	/// </summary>
+	public bool Closed
+	{
+		set
+		{
+			closed = value;
+		}
+		get
+		{
+			return closed;
+		}
+	}
+
+	/// <summary>
+	/// ID of the shape
+	/// </summary>
+	public string ID
+	{
+		set
+		{
+			guid = value;
+		}
+		get
+		{
+			return guid;
 		}
 	}
 

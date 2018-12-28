@@ -12,8 +12,31 @@ using Unity.VectorGraphics;
 /// </summary>
 public class CircleShape : VectorShape
 {
+	public const float BezierFactor = 0.55191502449f;
+
+	/// <summary>
+	/// Position of center.
+	/// </summary>
+	[SerializeField]
 	protected Vector2 position;
+
+	/// <summary>
+	/// Radius of circle.
+	/// </summary>
+	[SerializeField]
 	protected float radius;
+
+	/// <summary>
+	/// Starting angle for arcs (in radians).
+	/// </summary>
+	[SerializeField]
+	protected float startAngle;
+
+	/// <summary>
+	/// Sweep angle for arcs (in radians).
+	/// </summary>
+	[SerializeField]
+	protected float sweepAngle;
 
 	/// <summary>
 	/// Position of center.
@@ -48,6 +71,46 @@ public class CircleShape : VectorShape
 	}
 
 	/// <summary>
+	/// Starting angle for circular arcs (in degrees).
+	/// </summary>
+	public float StartAngle
+	{
+		set
+		{
+			startAngle = value * Mathf.Deg2Rad;
+			Dirty = true;
+		}
+		get
+		{
+			return startAngle * Mathf.Rad2Deg;
+		}
+	}
+
+	/// <summary>
+	/// Sweep angle for circular arcs (in degrees).
+	/// </summary>
+	public float SweepAngle
+	{
+		set
+		{
+			sweepAngle = value * Mathf.Deg2Rad;
+			if (Mathf.Approximately(value, 0f) || (Mathf.Abs(value) >= 360f))
+			{
+				closed = true;
+			}
+			else
+			{
+				closed = false;
+			}
+			Dirty = true;
+		}
+		get
+		{
+			return sweepAngle * Mathf.Rad2Deg;
+		}
+	}
+
+	/// <summary>
 	/// New circle from center point and radius.
 	/// </summary>
 	/// <param name="center">Center of circle</param>
@@ -56,6 +119,35 @@ public class CircleShape : VectorShape
 	{
 		position = center;
 		radius = rad;
+
+		startAngle = 0f;
+		sweepAngle = 0f;
+		closed = true;
+	}
+
+	/// <summary>
+	/// New circular arc from center point, radius, and angles.
+	/// </summary>
+	/// <param name="center">Center of circle</param>
+	/// <param name="rad">Radius of circle</param>
+	/// <param name="angle">Starting angle of arc (in degrees)</param>
+	/// <param name="sweep">Sweep of arc (in degrees)</param>
+	public CircleShape(Vector2 center, float rad, float angle, float sweep)
+	{
+		position = center;
+		radius = rad;
+
+		startAngle = angle * Mathf.Deg2Rad;
+		sweepAngle = sweep * Mathf.Deg2Rad;
+
+		if (Mathf.Approximately(sweep, 0f) || (Mathf.Abs(sweep) >= 360f))
+		{
+			closed = true;
+		}
+		else
+		{
+			closed = false;
+		}
 	}
 
 	/// <summary>
@@ -163,7 +255,16 @@ public class CircleShape : VectorShape
 		if ((shapeGeometry != null) && (!shapeDirty)) return;
 
 		Shape circle = new Shape();
-		VectorUtils.MakeCircleShape(circle, position, radius);
+		if (closed)
+		{
+			VectorUtils.MakeCircleShape(circle, position, radius);
+		}
+		else
+		{
+			BezierContour contour = new BezierContour();
+			contour.Segments = VectorUtils.MakeArc(position, startAngle, sweepAngle, radius);
+			circle.Contours = new BezierContour[] { contour };
+		}
 
 		circle.PathProps = new PathProperties()
 		{
