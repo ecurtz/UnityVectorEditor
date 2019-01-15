@@ -12,7 +12,44 @@ using Unity.VectorGraphics;
 /// </summary>
 public class CircleShape : VectorShape
 {
-	public const float BezierFactor = 0.55191502449f;
+	public class CircleProxy : ScriptableObject, ISerializationCallbackReceiver
+	{
+		[HideInInspector]
+		public CircleShape circle;
+
+		public Vector2 position;
+		public float radius;
+		public float startAngle;
+		public float sweepAngle;
+
+		public void OnBeforeSerialize()
+		{
+			if (circle != null)
+			{
+				circle.position = position;
+				circle.radius = radius;
+				circle.startAngle = startAngle;
+				circle.sweepAngle = sweepAngle;
+			}
+		}
+
+		public void OnAfterDeserialize()
+		{
+		}
+	}
+
+	public CircleProxy GetCircleProxy()
+	{
+		CircleProxy proxy = ScriptableObject.CreateInstance<CircleProxy>();
+		proxy.name = "Circle";
+		proxy.circle = this;
+		proxy.position = position;
+		proxy.radius = radius;
+		proxy.startAngle = startAngle;
+		proxy.sweepAngle = sweepAngle;
+
+		return proxy;
+	}
 
 	/// <summary>
 	/// Position of center.
@@ -110,6 +147,10 @@ public class CircleShape : VectorShape
 		}
 	}
 
+	protected CircleShape()
+	{
+	}
+
 	/// <summary>
 	/// New circle from center point and radius.
 	/// </summary>
@@ -148,6 +189,62 @@ public class CircleShape : VectorShape
 		{
 			closed = false;
 		}
+	}
+
+	public static CircleShape Create()
+	{
+		//CircleShape shape = ScriptableObject.CreateInstance<CircleShape>();
+		CircleShape shape = new CircleShape();
+
+		return shape;
+	}
+
+	/// <summary>
+	/// New circle from center point and radius.
+	/// </summary>
+	/// <param name="center">Center of circle</param>
+	/// <param name="rad">Radius of circle</param>
+	public static CircleShape Create(Vector2 center, float rad)
+	{
+		CircleShape shape = Create();
+
+		shape.position = center;
+		shape.radius = rad;
+
+		shape.startAngle = 0f;
+		shape.sweepAngle = 0f;
+		shape.closed = true;
+
+		return shape;
+	}
+
+	/// <summary>
+	/// New circular arc from center point, radius, and angles.
+	/// </summary>
+	/// <param name="center">Center of circle</param>
+	/// <param name="rad">Radius of circle</param>
+	/// <param name="angle">Starting angle of arc (in degrees)</param>
+	/// <param name="sweep">Sweep of arc (in degrees)</param>
+	public static CircleShape Create(Vector2 center, float rad, float angle, float sweep)
+	{
+		CircleShape shape = Create();
+
+		shape.position = center;
+		shape.radius = rad;
+
+		shape.startAngle = angle * Mathf.Deg2Rad;
+		shape.sweepAngle = sweep * Mathf.Deg2Rad;
+
+		if (Mathf.Approximately(sweep, 0f) || (Mathf.Abs(sweep) >= 360f))
+		{
+			shape.closed = true;
+		}
+		else
+		{
+			shape.closed = false;
+		}
+
+		return shape;
 	}
 
 	/// <summary>
@@ -219,6 +316,24 @@ public class CircleShape : VectorShape
 	}
 
 	/// <summary>
+	/// Change the size of the shape.
+	/// </summary>
+	/// <param name="scale">Scaling factor to apply</param>
+	public override void ScaleBy(float scale)
+	{
+		if (scale < Mathf.Epsilon)
+		{
+			Debug.LogWarning("Scale must be greater than zero.");
+			return;
+		}
+
+		position *= scale;
+		radius *= scale;
+
+		Dirty = true;
+	}
+
+	/// <summary>
 	/// Transform the shape by an arbitrary matrix.
 	/// </summary>
 	/// <param name="matrix">Matrix to transform shape</param>
@@ -248,6 +363,71 @@ public class CircleShape : VectorShape
 	}
 
 	/// <summary>
+	/// Distance between a point and the shape.
+	/// </summary>
+	/// <param name="pt">Test point</param>
+	/// <param name="mode">Snap modes to consider</param>
+	/// <returns>Distance from point to nearest point on shape</returns>
+	public override SnapPoint GetSnap(Vector2 pt, SnapPoint.Mode mode)
+	{
+		SnapPoint snap = new SnapPoint();
+		float distance = float.MaxValue;
+
+		if ((mode & SnapPoint.Mode.Center) != 0)
+		{
+			float d = Vector2.Distance(pt, position);
+			if (d < distance)
+			{
+				distance = d;
+				snap.mode = SnapPoint.Mode.Center;
+				snap.point = position;
+			}
+		}
+
+		if ((mode & SnapPoint.Mode.Midpoint) != 0)
+		{
+			float offset45 = 0.7071f * radius;
+			Vector2[] midPoints =
+			{
+				position + new Vector2(radius, 0f),
+				position + new Vector2(offset45, offset45),
+				position + new Vector2(0f, radius),
+				position + new Vector2(-offset45, offset45),
+				position + new Vector2(-radius, 0f),
+				position + new Vector2(-offset45, -offset45),
+				position + new Vector2(0f, -radius),
+				position + new Vector2(offset45, -offset45),
+			};
+
+			foreach (Vector2 testPt in midPoints)
+			{
+				float d = Vector2.Distance(pt, testPt);
+				if (d < distance)
+				{
+					distance = d;
+					snap.mode = SnapPoint.Mode.Midpoint;
+					snap.point = testPt;
+				}
+			}
+		}
+
+		if ((mode & SnapPoint.Mode.Edge) != 0)
+		{
+			float d = Distance(pt);
+			if (d < distance)
+			{
+				distance = d;
+				snap.mode = SnapPoint.Mode.Edge;
+				float angle = Mathf.Atan2(pt.y - position.y, pt.x - position.x);
+				snap.point.x = position.x + Mathf.Cos(angle) * radius;
+				snap.point.y = position.y + Mathf.Sin(angle) * radius;
+			}
+		}
+
+		return snap;
+	}
+
+	/// <summary>
 	/// Tessellate the shape into geometry data.
 	/// </summary>
 	protected override void GenerateGeometry()
@@ -271,7 +451,7 @@ public class CircleShape : VectorShape
 			Stroke = new Stroke()
 			{
 				Color = colorOutline,
-				HalfThickness = penSize / Screen.dpi
+				HalfThickness = penSize / 2f * penToMeshScale
 			}
 		};
 		if (colorFill != Color.clear)
@@ -377,6 +557,8 @@ public class CircleShape : VectorShape
 	/// <param name="active">Is it the active shape?</param>
 	public override void DrawEditorHandles(bool selected, bool active = false)
 	{
+		base.DrawEditorHandles(selected, active);
+
 		if (selected)
 		{
 			if (boundsDirty) GenerateBounds();

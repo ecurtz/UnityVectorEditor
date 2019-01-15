@@ -10,10 +10,20 @@ using UnityEditor;
 public static class VectorShapeIcons
 {
 	static Material renderMaterial;
+	static VectorUtils.TessellationOptions tessellationOptions;
 
 	static VectorShapeIcons()
 	{
 		renderMaterial = new Material(Shader.Find("Unlit/Vector"));
+
+		tessellationOptions = new VectorUtils.TessellationOptions()
+		{
+			StepDistance = 0.1f,
+			MaxCordDeviation = float.MaxValue,
+			MaxTanAngleDeviation = Mathf.PI / 16.0f,
+			SamplingStepSize = 0.01f
+		};
+
 	}
 
 #if UNITY_EDITOR
@@ -32,18 +42,11 @@ public static class VectorShapeIcons
 
 		// Save the render state and get a temporary render texture
 		RenderTexture activeTexture = RenderTexture.active;
-		renderUtil.camera.targetTexture = RenderTexture.GetTemporary(width, height, 8, RenderTextureFormat.ARGB32);
+		renderUtil.camera.targetTexture = RenderTexture.GetTemporary(width * 2, height * 2, 8, RenderTextureFormat.ARGB32);
 		renderUtil.camera.backgroundColor = Color.clear;
 
 		// Generate the mesh
 		Mesh iconMesh = new Mesh();
-		VectorUtils.TessellationOptions tessellationOptions = new VectorUtils.TessellationOptions()
-		{
-			StepDistance = 0.05f,
-			MaxCordDeviation = float.MaxValue,
-			MaxTanAngleDeviation = Mathf.PI / 2.0f,
-			SamplingStepSize = 0.01f
-		};
 		List<VectorUtils.Geometry> iconGeometry = VectorUtils.TessellateScene(sceneInfo.Scene, tessellationOptions);
 		VectorUtils.FillMesh(iconMesh, iconGeometry, 1f);
 
@@ -60,8 +63,8 @@ public static class VectorShapeIcons
 		renderUtil.camera.transform.Rotate(0, 0, 180f);
 		renderUtil.camera.orthographicSize = cameraSize;
 		renderUtil.camera.transform.position = cameraPosition;
-		Texture2D iconTexture = new Texture2D(width, height);
-		iconTexture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+		Texture2D iconTexture = new Texture2D(width * 2, height * 2);
+		iconTexture.ReadPixels(new Rect(0, 0, width * 2, height * 2), 0, 0);
 		iconTexture.Apply();
 
 		// Restore the render state and release the temporary render texture
@@ -76,16 +79,18 @@ public static class VectorShapeIcons
 	/// </summary>
 	public static Texture2D GetIcon(VectorShape shape, PreviewRenderUtility renderUtil)
 	{
+		VectorUtils.TessellationOptions activeOptions = VectorShape.tessellationOptions;
+		VectorShape.tessellationOptions = tessellationOptions;
+		shape.Dirty = true;
+
 		Rect shapeBounds = shape.ShapeBounds;
 		int width = Mathf.CeilToInt(shapeBounds.width);
 		int height = Mathf.CeilToInt(shapeBounds.height);
 
 		// Save the render state and get a temporary render texture
 		RenderTexture activeTexture = RenderTexture.active;
-		renderUtil.camera.targetTexture = RenderTexture.GetTemporary(width, height, 8, RenderTextureFormat.ARGB32);
+		renderUtil.camera.targetTexture = RenderTexture.GetTemporary(width * 2, height * 2, 8, RenderTextureFormat.ARGB32);
 		renderUtil.camera.backgroundColor = Color.clear;
-		Matrix4x4 drawMatrix = Matrix4x4.identity;
-		renderUtil.DrawMesh(shape.ShapeMesh, drawMatrix, renderMaterial, 0);
 
 		// Activate the render texture and draw the shape into it
 		RenderTexture.active = renderUtil.camera.targetTexture;
@@ -93,16 +98,23 @@ public static class VectorShapeIcons
 		Vector3 cameraPosition = renderUtil.camera.transform.position;
 		renderUtil.camera.orthographicSize = shapeBounds.height / 2;
 		renderUtil.camera.transform.position = new Vector3(shapeBounds.center.x, shapeBounds.center.y, -1);
+
+		Matrix4x4 drawMatrix = Matrix4x4.identity;
+		renderUtil.DrawMesh(shape.ShapeMesh, drawMatrix, renderMaterial, 0);
+
 		renderUtil.camera.Render();
 		renderUtil.camera.orthographicSize = cameraSize;
 		renderUtil.camera.transform.position = cameraPosition;
-		Texture2D iconTexture = new Texture2D(width, height);
-		iconTexture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+		Texture2D iconTexture = new Texture2D(width * 2, height * 2);
+		iconTexture.ReadPixels(new Rect(0, 0, width * 2, height * 2), 0, 0);
 		iconTexture.Apply();
 
 		// Restore the render state and release the temporary render texture
 		RenderTexture.active = activeTexture;
 		RenderTexture.ReleaseTemporary(renderUtil.camera.targetTexture);
+
+		VectorShape.tessellationOptions = activeOptions;
+		shape.Dirty = true;
 
 		return iconTexture;
 	}
@@ -245,5 +257,10 @@ public static class VectorShapeIcons
 	public static string iconPolygon =
 		svgIconHeader +
 		"<path d = \"M6.5,17H15L18.5,12L15,7H6.5L10,12L6.5,17M15,19H3L7.5,12L3,5H15C15.69,5 16.23,5.3 16.64,5.86L21,12L16.64,18.14C16.23,18.7 15.69,19 15,19Z\"/>" +
+		svgIconFooter;
+
+	public static string iconVerticalDots =
+		svgIconHeader +
+		"<path d = \"M12,16A2,2 0 0,1 14,18A2,2 0 0,1 12,20A2,2 0 0,1 10,18A2,2 0 0,1 12,16M12,10A2,2 0 0,1 14,12A2,2 0 0,1 12,14A2,2 0 0,1 10,12A2,2 0 0,1 12,10M12,4A2,2 0 0,1 14,6A2,2 0 0,1 12,8A2,2 0 0,1 10,6A2,2 0 0,1 12,4Z\"/>" +
 		svgIconFooter;
 }

@@ -12,16 +12,11 @@ public class VectorShapeEditor : EditorWindow
 	/// </summary>
 	protected enum ToolSet
 	{
-		None = -1,
 		View,
 		Select,
 		Brush,
 		Shape
 	}
-	protected const int ToolView = (int)ToolSet.View;
-	protected const int ToolSelect = (int)ToolSet.Select;
-	protected const int ToolBrush = (int)ToolSet.Brush;
-	protected const int ToolShape = (int)ToolSet.Shape;
 	const int ToolSetCount = 4;
 	protected static GUIContent[] toolIcons;
 
@@ -30,7 +25,6 @@ public class VectorShapeEditor : EditorWindow
 	/// </summary>
 	protected enum ShapeSet
 	{
-		None = -1,
 		Point,
 		Circle,
 		Triangle,
@@ -39,13 +33,6 @@ public class VectorShapeEditor : EditorWindow
 		Hexagon,
 		Polygon
 	}
-	protected const int ShapePoint = (int)ShapeSet.Point;
-	protected const int ShapeCircle = (int)ShapeSet.Circle;
-	protected const int ShapeTriangle = (int)ShapeSet.Triangle;
-	protected const int ShapeRectangle = (int)ShapeSet.Rectangle;
-	protected const int ShapePentagon = (int)ShapeSet.Pentagon;
-	protected const int ShapeHexagon = (int)ShapeSet.Hexagon;
-	protected const int ShapePolygon = (int)ShapeSet.Polygon;
 	const int ShapeSetCount = 7;
 	protected static GUIContent[] shapeIcons;
 
@@ -54,25 +41,42 @@ public class VectorShapeEditor : EditorWindow
 	/// </summary>
 	protected enum SelectionSet
 	{
-		None = -1,
 		Object,
 		Component,
 		Vertex
 	}
-	protected const int SelectionObject = (int)SelectionSet.Object;
-	protected const int SelectionComponent = (int)SelectionSet.Component;
-	protected const int SelectionVertex = (int)SelectionSet.Vertex;
 	const int SelectionSetCount = 3;
 	protected static GUIContent[] selectionIcons;
 
 	/// <summary>
-	/// Behavior of selection operations
+	/// Action taken with input events
 	/// </summary>
-	protected enum SelectionType
+	protected enum ActionType
 	{
-		Normal,
-		Additive,
-		Subtractive
+		None = -1,
+		ViewPan,
+		ViewZoom,
+		SelectNormal,
+		SelectAdditive,
+		SelectSubtractive,
+		LineEdit,
+		CurveEdit,
+		ShapeEdit,
+		SetOrigin,
+		ChangeScale
+	}
+	protected ActionType baseAction = ActionType.None;
+	protected ActionType quickAction = ActionType.None;
+	protected ActionType overrideAction = ActionType.None;
+
+	protected ActionType action
+	{
+		get
+		{
+			if (overrideAction != ActionType.None) return overrideAction;
+			if (quickAction != ActionType.None) return quickAction;
+			return baseAction;
+		}
 	}
 
 	/// <remarks>
@@ -98,16 +102,18 @@ public class VectorShapeEditor : EditorWindow
 	/// <summary>
 	/// Miscellaneous GUI content.
 	/// </summary>
+	protected static GUIContent iconMoreTools;
 	protected static GUIContent iconShapeStroke;
 	protected static GUIContent iconShapeFill;
 
+	public float shapePenSize = 2f;
 	public Color shapeOutlineColor = Color.black;
 	public Color shapeFillColor = Color.clear;
 
 	/// <summary>
 	/// Window state.
 	/// </summary>
-	protected ViewTool activeViewTool;
+	protected EditorWindow popup;
 
 	protected ToolSet activeTool;
 	protected SelectionSet activeSelect;
@@ -124,6 +130,8 @@ public class VectorShapeEditor : EditorWindow
 	const int toolbarWidth = 32;
 	const int colorFieldWidth = 40;
 
+	const int toolAreaHeight = toolbarHeight + toolbarPadding * 2;
+
 	/// <summary>
 	/// User interaction state.
 	/// </summary>
@@ -139,6 +147,15 @@ public class VectorShapeEditor : EditorWindow
 	const float dragMargin = 8f;
 	protected bool dragActive;
 	protected Rect selectionRect;
+
+	protected bool showSnap;
+	protected Vector2 snapPosition;
+
+	/// <summary>
+	/// Edit target.
+	/// </summary>
+	protected SerializedShape targetShape;
+	protected bool shapeDirty;
 
 	/// <summary>
 	/// Initializes the GUI Content.
@@ -164,16 +181,16 @@ public class VectorShapeEditor : EditorWindow
 			toolIcons = new GUIContent[ToolSetCount];
 
 			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconView, renderUtil);
-			toolIcons[ToolView] = new GUIContent(icon, "View Tool");
+			toolIcons[(int)ToolSet.View] = new GUIContent(icon, "View Tool");
 
 			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconSelectionRect, renderUtil);
-			toolIcons[ToolSelect] = new GUIContent(icon, "Selection Tool");
+			toolIcons[(int)ToolSet.Select] = new GUIContent(icon, "Selection Tool");
 
 			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconBrush, renderUtil);
-			toolIcons[ToolBrush] = new GUIContent(icon, "Draw Tool");
+			toolIcons[(int)ToolSet.Brush] = new GUIContent(icon, "Draw Tool");
 
 			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconShapes, renderUtil);
-			toolIcons[ToolShape] = new GUIContent(icon, "Shape Tool");
+			toolIcons[(int)ToolSet.Shape] = new GUIContent(icon, "Shape Tool");
 		}
 
 		if (shapeIcons == null)
@@ -181,25 +198,25 @@ public class VectorShapeEditor : EditorWindow
 			shapeIcons = new GUIContent[ShapeSetCount];
 
 			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconPoint, renderUtil);
-			shapeIcons[ShapePoint] = new GUIContent(icon, "Create Point");
+			shapeIcons[(int)ShapeSet.Point] = new GUIContent(icon, "Create Point");
 
 			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconCircle, renderUtil);
-			shapeIcons[ShapeCircle] = new GUIContent(icon, "Create Circle");
+			shapeIcons[(int)ShapeSet.Circle] = new GUIContent(icon, "Create Circle");
 
 			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconTriangle, renderUtil);
-			shapeIcons[ShapeTriangle] = new GUIContent(icon, "Create Triangle");
+			shapeIcons[(int)ShapeSet.Triangle] = new GUIContent(icon, "Create Triangle");
 
 			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconSquare, renderUtil);
-			shapeIcons[ShapeRectangle] = new GUIContent(icon, "Create Rectangle");
+			shapeIcons[(int)ShapeSet.Rectangle] = new GUIContent(icon, "Create Rectangle");
 
 			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconPentagon, renderUtil);
-			shapeIcons[ShapePentagon] = new GUIContent(icon, "Create Pentagon");
+			shapeIcons[(int)ShapeSet.Pentagon] = new GUIContent(icon, "Create Pentagon");
 
 			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconHexagon, renderUtil);
-			shapeIcons[ShapeHexagon] = new GUIContent(icon, "Create Hexagon");
+			shapeIcons[(int)ShapeSet.Hexagon] = new GUIContent(icon, "Create Hexagon");
 
 			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconPolygon, renderUtil);
-			shapeIcons[ShapePolygon] = new GUIContent(icon, "Create Polygon");
+			shapeIcons[(int)ShapeSet.Polygon] = new GUIContent(icon, "Create Polygon");
 		}
 
 		if (selectionIcons == null)
@@ -207,13 +224,19 @@ public class VectorShapeEditor : EditorWindow
 			selectionIcons = new GUIContent[SelectionSetCount];
 
 			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconSelectObject, renderUtil);
-			selectionIcons[SelectionObject] = new GUIContent(icon, "Select Shapes");
+			selectionIcons[(int)SelectionSet.Object] = new GUIContent(icon, "Select Shapes");
 
 			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconSelectSegment, renderUtil);
-			selectionIcons[SelectionComponent] = new GUIContent(icon, "Select Segments");
+			selectionIcons[(int)SelectionSet.Component] = new GUIContent(icon, "Select Segments");
 
 			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconSelectVertex, renderUtil);
-			selectionIcons[SelectionVertex] = new GUIContent(icon, "Select Vertices");
+			selectionIcons[(int)SelectionSet.Vertex] = new GUIContent(icon, "Select Vertices");
+		}
+
+		if (iconMoreTools == null)
+		{
+			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconVerticalDots, renderUtil);
+			iconMoreTools = new GUIContent(icon, "More Tools");
 		}
 
 		if (iconShapeStroke == null)
@@ -229,18 +252,16 @@ public class VectorShapeEditor : EditorWindow
 		}
 	}
 
-	/// <summary>
-	/// Union of two Rects
-	/// </summary>
-	/// <returns>The union.</returns>
-	/// <param name="rectA">Rect A</param>
-	/// <param name="rectB">Rect B</param>
-	private static Rect RectUnion(Rect rectA, Rect rectB)
+	public static void OpenEditor(SerializedShape shape)
 	{
-		return Rect.MinMaxRect(Mathf.Min(rectA.xMin, rectB.xMin),
-							   Mathf.Min(rectA.yMin, rectB.yMin),
-		                       Mathf.Max(rectA.xMax, rectB.xMax),
-		                       Mathf.Max(rectA.yMax, rectB.yMax));
+		VectorShapeEditor editorWindow = EditorWindow.GetWindow(typeof(VectorShapeEditor)) as VectorShapeEditor;
+
+		if (editorWindow.OnCheckSave())
+		{
+			editorWindow.titleContent.text = shape.name;
+			editorWindow.Shapes = shape.components;
+			editorWindow.Focus();
+		}
 	}
 
 	public List<VectorShape> Shapes
@@ -260,20 +281,12 @@ public class VectorShapeEditor : EditorWindow
 			}
 			foreach (VectorShape shape in shapes)
 			{
-				bounds = RectUnion(bounds, shape.ShapeBounds);
+				bounds = VectorShapeUtils.RectUnion(bounds, shape.ShapeBounds);
 			}
 
-			renderUtil.camera.transform.position = new Vector3(bounds.center.x, bounds.center.y, -1);
-			renderUtil.camera.orthographicSize = bounds.height * 0.6f;
+			SetCameraView(bounds.height * 0.6f, bounds.center);
 
-			float penSize = bounds.height / 5f;
-			foreach (VectorShape shape in shapes)
-			{
-				shape.penSize = penSize;
-				shape.Dirty = true;
-			}
-
-			Repaint();
+			shapeDirty = false;
 		}
 		get
 		{
@@ -298,9 +311,101 @@ public class VectorShapeEditor : EditorWindow
 		}
 	}
 
+	protected void SetCameraView(float size, Vector2 position)
+	{
+		renderUtil.camera.orthographicSize = size;
+		renderUtil.camera.transform.position = new Vector3(position.x, position.y, -1f);
+		UpdateMouseToShape();
+
+		foreach (VectorShape shape in shapes)
+		{
+			shape.penToMeshScale = mouseToShapeScale;
+			shape.Dirty = true;
+		}
+
+		Repaint();
+	}
+
+	protected void SetCameraSize(float size)
+	{
+		renderUtil.camera.orthographicSize = size;
+		UpdateMouseToShape();
+
+		foreach (VectorShape shape in shapes)
+		{
+			shape.penToMeshScale = mouseToShapeScale;
+			shape.Dirty = true;
+		}
+
+		Repaint();
+	}
+
+	protected void SetCameraPosition(Vector2 position)
+	{
+		renderUtil.camera.transform.position = new Vector3(position.x, position.y, -1f);
+		UpdateMouseToShape();
+
+		Repaint();
+	}
+
 	public Vector2 MouseToShapePoint(Vector2 mousePoint)
 	{
 		return mouseToShapeMatrix * mousePoint;
+	}
+
+	protected void UpdateMouseToShape()
+	{
+		Rect viewRect = new Rect(0, toolAreaHeight, this.position.width, this.position.height - toolAreaHeight);
+		mouseToShapeScale = renderUtil.camera.orthographicSize * 2f / viewRect.height;
+		mouseToShapeMatrix =
+			Matrix2D.Translate(renderUtil.camera.transform.position) *
+			Matrix2D.Scale(new Vector2(mouseToShapeScale, -mouseToShapeScale)) *
+			Matrix2D.Translate(-viewRect.center);
+	}
+
+	protected bool OnCheckSave()
+	{
+		bool accepted = true;
+
+		if (shapeDirty)
+		{
+			int option = EditorUtility.DisplayDialogComplex(
+				"Unsaved Changes",
+				"Do you want to save the changes you've made?",
+				"Save", "Cancel", "Don't Save");
+
+			switch (option)
+			{
+				case 0: // Save
+					SaveShape();
+					break;
+
+				case 1: // Cancel
+					accepted = false;
+					break;
+
+				case 2: // Don't Save.
+					break;
+
+				default:
+					break;
+			}
+		}
+
+		return accepted;
+	}
+
+	protected void SaveShape()
+	{
+		string path;
+		if (targetShape != null)
+		{
+			path = "";
+		}
+		else
+		{
+			path = EditorUtility.SaveFilePanelInProject("Save shape", "New Shape", "asset", "");
+		}
 	}
 
 	public void OnEnable()
@@ -311,7 +416,7 @@ public class VectorShapeEditor : EditorWindow
 		renderUtil.camera.clearFlags = CameraClearFlags.SolidColor;
 		renderUtil.camera.nearClipPlane = 0.1f;
 		renderUtil.camera.farClipPlane = 100.0f;
-		renderUtil.camera.transform.position = new Vector3(0, 0, -1);
+		renderUtil.camera.transform.position = new Vector3(0f, 0f, -1f);
 
 		InitializeGUIContent();
 
@@ -321,8 +426,23 @@ public class VectorShapeEditor : EditorWindow
 
 	public void OnDisable()
 	{
+		if (popup != null)
+		{
+			popup.Close();
+			popup = null;
+		}
+
 		renderUtil.Cleanup();
 		EditorApplication.modifierKeysChanged -= OnModifierKeys;
+	}
+
+	public void OnDestroy()
+	{
+		if (popup != null)
+		{
+			DestroyImmediate(popup);
+			popup = null;
+		}
 	}
 
 	public void OnModifierKeys()
@@ -333,72 +453,156 @@ public class VectorShapeEditor : EditorWindow
 	protected void OnToolbarArea(Event guiEvent, Rect guiRect)
 	{
 		int activeButton = (int)activeTool;
-		if ((activeTool != ToolSet.View) && (activeViewTool != ViewTool.None))
+		if (overrideAction != ActionType.None)
 		{
-			activeButton = ToolView;
+			switch (overrideAction)
+			{
+				case ActionType.ViewPan:
+				case ActionType.ViewZoom:
+					activeButton = (int)ToolSet.View;
+					break;
+			}
 		}
 
-		int newButton = GUI.Toolbar(guiRect, activeButton, toolIcons);
+		Rect toolbarRect = new Rect(guiRect);
+		toolbarRect.width = toolbarWidth * toolIcons.Length;
+		int newButton = GUI.Toolbar(toolbarRect, activeButton, toolIcons);
 		if (newButton != activeButton)
 		{
-			switch (newButton)
+			activeTool = (ToolSet)newButton;
+		}
+
+		Rect buttonRect = new Rect(guiRect);
+		buttonRect.width = toolbarWidth;
+		buttonRect.x = toolbarRect.xMax + toolbarPadding;
+		if (GUI.Button(buttonRect, iconMoreTools))
+		{
+			GenericMenu toolMenu = new GenericMenu();
+
+			toolMenu.AddItem(new GUIContent("Move Origin"), false, OnMoveOrigin);
+			toolMenu.AddItem(new GUIContent("Change Scale"), false, OnChangeScale);
+
+			toolMenu.AddSeparator("");
+
+			toolMenu.AddItem(new GUIContent("Load SVG"), false, OnLoadSVG);
+
+			toolMenu.DropDown(buttonRect);
+		}
+	}
+
+	protected void OnMoveOrigin()
+	{
+		quickAction = ActionType.SetOrigin;
+		showSnap = true;
+	}
+
+	protected void OnChangeScale()
+	{
+		quickAction = ActionType.ChangeScale;
+	}
+
+	protected void OnChangeScale(float scale)
+	{
+		popup.Close();
+		popup = null;
+	}
+
+	protected void OnLoadSVG()
+	{
+		if (OnCheckSave())
+		{
+			string[] svgExtensions = { "svg", "SVG" };
+			string svgPath = EditorUtility.OpenFilePanelWithFilters("Load SVG", "", svgExtensions);
+			if (System.IO.File.Exists(svgPath))
 			{
-				case ToolView:
-					activeTool = ToolSet.View;
-					break;
-				case ToolSelect:
-					activeTool = ToolSet.Select;
-					break;
-				case ToolBrush:
-					SetFocusedShape(null);
-					activeTool = ToolSet.Brush;
-					break;
-				case ToolShape:
-					SetFocusedShape(null);
-					activeTool = ToolSet.Shape;
-					break;
+				System.IO.StreamReader reader = System.IO.File.OpenText(svgPath);
+				Shapes = VectorShapeFilesSVG.ReadSVG(reader);
 			}
 		}
 	}
 
+	const float penLabelWidth = 26f;
+	const float penSizeWidth = 50f;
+	const float fillLabelWidth = 20f;
+
+	const float colorChooserWidth = 24f;
+
+	static GUIContent penLabelContent = new GUIContent("Pen", "Size and color of outline.");
+	static GUIContent fillLabelContent = new GUIContent("Fill", "Color of interior.");
+
+	VectorShape.ShapeProxy testProxy;
 	protected void OnShapeColorArea(Event guiEvent, Rect guiRect)
 	{
-		// HACK - this is ridiculous, may as well hard code everything
-		GUILayout.BeginArea(guiRect);
-		EditorGUILayout.BeginHorizontal();
+		if (testProxy == null)
+		{
+			testProxy = ScriptableObject.CreateInstance<VectorShape.ShapeProxy>();
+			testProxy.name = "Shape";
+			//testProxy.hideFlags = HideFlags.HideAndDontSave;
+			testProxy.penSize = shapePenSize;
+			testProxy.colorOutline = shapeOutlineColor;
+			testProxy.colorFill = shapeFillColor;
+		}
 
-		GUILayout.FlexibleSpace();
+		// Go right to left
+		Rect displayRect = new Rect(guiRect);
+		displayRect.height = EditorGUIUtility.singleLineHeight;
+		displayRect.y += (guiRect.height - displayRect.height) / 2f;
+		displayRect.width -= toolbarPadding;
+		Rect fillColorRect = new Rect(displayRect);
+		fillColorRect.width = colorChooserWidth;
+		fillColorRect.x = displayRect.xMax - fillColorRect.width;
+		Rect fillLabelRect = new Rect(displayRect);
+		fillLabelRect.width = fillLabelWidth;
+		fillLabelRect.x = fillColorRect.x - fillLabelRect.width;
 
-		EditorGUILayout.BeginVertical();
-		GUILayout.FlexibleSpace();
-		GUILayout.Box(iconShapeStroke, GUIStyle.none);
-		GUILayout.FlexibleSpace();
-		EditorGUILayout.EndVertical();
+		Rect penColorRect = new Rect(displayRect);
+		penColorRect.width = colorChooserWidth;
+		penColorRect.x = fillLabelRect.x - penColorRect.width - toolbarPadding;
+		Rect penSizeRect = new Rect(displayRect);
+		penSizeRect.width = penSizeWidth;
+		penSizeRect.x = penColorRect.x - penSizeRect.width - toolbarPadding;
+		Rect penLabelRect = new Rect(displayRect);
+		penLabelRect.width = penLabelWidth;
+		penLabelRect.x = penSizeRect.x - penLabelRect.width;
 
-		EditorGUILayout.BeginVertical();
-		GUILayout.FlexibleSpace();
-		shapeOutlineColor = EditorGUILayout.ColorField(shapeOutlineColor, GUILayout.MaxWidth(colorFieldWidth));
-		GUILayout.FlexibleSpace();
-		EditorGUILayout.EndVertical();
+		GUIStyle rightJustified = new GUIStyle(GUI.skin.label);
+		rightJustified.alignment = TextAnchor.MiddleRight;
 
-		GUILayout.FlexibleSpace();
+		SerializedObject propertyObject = new SerializedObject(testProxy);
+		EditorGUI.BeginChangeCheck();
 
-		EditorGUILayout.BeginVertical();
-		GUILayout.FlexibleSpace();
-		GUILayout.Box(iconShapeFill, GUIStyle.none);
-		GUILayout.FlexibleSpace();
-		EditorGUILayout.EndVertical();
+		EditorGUI.LabelField(penLabelRect, penLabelContent, rightJustified);
+		SerializedProperty penSize = propertyObject.FindProperty("penSize");
+		SerializedProperty colorOutline = propertyObject.FindProperty("colorOutline");
+		penSize.floatValue = GUI.HorizontalSlider(penSizeRect, penSize.floatValue, 0f, 25f);
+		colorOutline.colorValue = EditorGUI.ColorField(penColorRect, GUIContent.none, colorOutline.colorValue, false, true, false);
 
-		EditorGUILayout.BeginVertical();
-		GUILayout.FlexibleSpace();
-		shapeFillColor = EditorGUILayout.ColorField(shapeFillColor, GUILayout.MaxWidth(colorFieldWidth));
-		GUILayout.FlexibleSpace();
-		EditorGUILayout.EndVertical();
+		EditorGUI.LabelField(fillLabelRect, fillLabelContent, rightJustified);
+		SerializedProperty colorFill = propertyObject.FindProperty("colorFill");
+		colorFill.colorValue = EditorGUI.ColorField(fillColorRect, GUIContent.none, colorFill.colorValue, false, true, false);
 
-		GUILayout.FlexibleSpace();
+		if (EditorGUI.EndChangeCheck() || propertyObject.hasModifiedProperties)
+		{
+			propertyObject.ApplyModifiedProperties();
+			propertyObject.Update();
 
-		EditorGUILayout.EndHorizontal();
-		GUILayout.EndArea();
+			shapePenSize = testProxy.penSize;
+			shapeOutlineColor = testProxy.colorOutline;
+			shapeFillColor = testProxy.colorFill;
+		}
+		//EditorGUI.BeginChangeCheck();
+		//EditorGUI.LabelField(penLabelRect, penLabelContent);
+		//shapePenSize = EditorGUI.DelayedFloatField(penSizeRect, shapePenSize);
+
+		//shapeOutlineColor = EditorGUI.ColorField(penColorRect, GUIContent.none, shapeOutlineColor, false, true, false);
+
+		//EditorGUI.LabelField(fillLabelRect, fillLabelContent);
+		//shapeFillColor = EditorGUI.ColorField(fillColorRect, GUIContent.none, shapeFillColor, false, true, false);
+
+		//if (EditorGUI.EndChangeCheck())
+		//{
+		//}
+
 	}
 
 	protected void OnInfoAreaView(Event guiEvent, Rect guiRect)
@@ -443,18 +647,7 @@ public class VectorShapeEditor : EditorWindow
 		int newButton = GUI.Toolbar(toolbarRect, activeButton, selectionIcons);
 		if (newButton != activeButton)
 		{
-			switch (newButton)
-			{
-				case SelectionObject:
-					activeSelect = SelectionSet.Object;
-					break;
-				case SelectionComponent:
-					activeSelect = SelectionSet.Component;
-					break;
-				case SelectionVertex:
-					activeSelect = SelectionSet.Vertex;
-					break;
-			}
+			activeSelect = (SelectionSet)newButton;
 		}
 
 		if (focusedShape != null)
@@ -464,6 +657,7 @@ public class VectorShapeEditor : EditorWindow
 		}
 		Color currentOutline = shapeOutlineColor;
 		Color currentFill = shapeFillColor;
+		float currentPen = shapePenSize;
 
 		Rect colorsRect = new Rect(toolbarRect.xMax, guiRect.position.y, guiRect.xMax - toolbarRect.xMax, guiRect.height);
 		OnShapeColorArea(guiEvent, colorsRect);
@@ -484,6 +678,14 @@ public class VectorShapeEditor : EditorWindow
 				shape.Dirty = true;
 			}
 		}
+		if (!Mathf.Approximately(currentPen, shapePenSize))
+		{
+			foreach (VectorShape shape in selection)
+			{
+				shape.penSize = shapePenSize;
+				shape.Dirty = true;
+			}
+		}
 	}
 
 	protected void OnInfoAreaBrush(Event guiEvent, Rect guiRect)
@@ -500,30 +702,7 @@ public class VectorShapeEditor : EditorWindow
 		int newButton = GUI.Toolbar(toolbarRect, activeButton, shapeIcons);
 		if (newButton != activeButton)
 		{
-			switch (newButton)
-			{
-				case ShapePoint:
-					activeShape = ShapeSet.Point;
-					break;
-				case ShapeCircle:
-					activeShape = ShapeSet.Circle;
-					break;
-				case ShapeTriangle:
-					activeShape = ShapeSet.Triangle;
-					break;
-				case ShapeRectangle:
-					activeShape = ShapeSet.Rectangle;
-					break;
-				case ShapePentagon:
-					activeShape = ShapeSet.Pentagon;
-					break;
-				case ShapeHexagon:
-					activeShape = ShapeSet.Hexagon;
-					break;
-				case ShapePolygon:
-					activeShape = ShapeSet.Polygon;
-					break;
-			}
+			activeShape = (ShapeSet)newButton;
 
 			SetFocusedShape(null);
 		}
@@ -536,24 +715,11 @@ public class VectorShapeEditor : EditorWindow
 	{
 		Event guiEvent = Event.current;
 
-		activeViewTool = ViewTool.None;
 		if (guiEvent.isScrollWheel)
 		{
-			activeViewTool = ViewTool.Zoom;
+			overrideAction = ActionType.ViewZoom;
 		}
-		else if ((activeTool == ToolSet.View) || (guiEvent.alt))
-		{
-			if (guiEvent.control)
-			{
-				activeViewTool = ViewTool.Zoom;
-			}
-			else
-			{
-				activeViewTool = ViewTool.Pan;
-			}
-		}
-
-		if (guiEvent.type == EventType.MouseDown)
+		else if (guiEvent.type == EventType.MouseDown)
 		{
 			mouseDownPosition = guiEvent.mousePosition;
 			mouseDownTime = Time.time;
@@ -563,10 +729,25 @@ public class VectorShapeEditor : EditorWindow
 		{
 			mouseIsDown = false;
 		}
+		else if (guiEvent.type != EventType.Repaint)
+		{
+			overrideAction = ActionType.None;
+			if (guiEvent.alt)
+			{
+				if (guiEvent.control)
+				{
+					overrideAction = ActionType.ViewZoom;
+				}
+				else
+				{
+					overrideAction = ActionType.ViewPan;
+				}
+			}
+		}
 
-		Rect toolRect = new Rect(0, 0, this.position.width, toolbarHeight + toolbarPadding * 2);
+		Rect toolRect = new Rect(0, 0, this.position.width, toolAreaHeight);
 
-		Rect toolbarRect = new Rect(toolbarPadding * 2, toolbarPadding, toolbarWidth * toolIcons.Length, toolbarHeight);
+		Rect toolbarRect = new Rect(toolbarPadding * 2, toolbarPadding, toolbarWidth * (toolIcons.Length + 1) + toolbarPadding, toolbarHeight);
 		OnToolbarArea(guiEvent, toolbarRect);
 
 		Rect separatorRect = new Rect(toolbarRect.xMax + toolbarPadding, 0, separatorWidth, toolRect.height);
@@ -577,43 +758,46 @@ public class VectorShapeEditor : EditorWindow
 		{
 			case ToolSet.View:
 				OnInfoAreaView(guiEvent, infoRect);
+				baseAction = ActionType.ViewPan;
 				break;
 			case ToolSet.Select:
 				OnInfoAreaSelect(guiEvent, infoRect);
+				baseAction = ActionType.SelectNormal;
 				break;
 			case ToolSet.Brush:
 				OnInfoAreaBrush(guiEvent, infoRect);
+				baseAction = ActionType.LineEdit;
 				break;
 			case ToolSet.Shape:
-				OnInfoAreaShape(guiEvent,  infoRect);
+				OnInfoAreaShape(guiEvent, infoRect);
+				baseAction = ActionType.ShapeEdit;
 				break;
 		}
 
 		Rect viewRect = new Rect(0, toolRect.yMax, this.position.width, this.position.height - toolRect.yMax);
 
 		MouseCursor activeCursor = MouseCursor.Arrow;
-		switch (activeViewTool)
+		switch (action)
 		{
-			case ViewTool.Zoom:
-				activeCursor = MouseCursor.Zoom;
-				break;
-			case ViewTool.Pan:
+			case ActionType.ViewPan:
 				activeCursor = MouseCursor.Pan;
+				break;
+			case ActionType.ViewZoom:
+				activeCursor = MouseCursor.Zoom;
 				break;
 		}
 		EditorGUIUtility.AddCursorRect(viewRect, activeCursor);
 
 		bool handled = false;
+
 		if (guiEvent.type == EventType.Repaint)
 		{
 			renderUtil.BeginPreview(viewRect, GUIStyle.none);
-			// renderUtil.camera.backgroundColor is reset in BeginPreview()
 			renderUtil.camera.backgroundColor = backgroundColor;
 
 			foreach (VectorShape shape in shapes)
 			{
 				renderUtil.DrawMesh(shape.ShapeMesh, Matrix4x4.identity, renderMaterial, 0);
-				//Debug.Log(shape.ShapeMesh.vertexCount);
 			}
 			renderUtil.Render();
 
@@ -633,48 +817,72 @@ public class VectorShapeEditor : EditorWindow
 			}
 
 			renderUtil.EndAndDrawPreview(viewRect);
+
+			Vector2 originLoc = mouseToShapeMatrix.Inverse().MultiplyPoint(Vector2.zero);
+			if (viewRect.Contains(originLoc))
+			{
+				GUIStyle originPivot = "U2D.pivotDot";
+				if (originPivot != null)
+				{
+					Rect pivotRect = new Rect(0f, 0f, originPivot.fixedWidth, originPivot.fixedHeight);
+					pivotRect.center = originLoc;
+					originPivot.Draw(pivotRect, false, false, false, false);
+				}
+			}
+
+			if (showSnap)
+			{
+				Vector2 snapLoc = mouseToShapeMatrix.Inverse().MultiplyPoint(snapPosition);
+				if (viewRect.Contains(snapLoc))
+				{
+					GUIStyle snapPivot = "U2D.dragDot";
+					if (snapPivot != null)
+					{
+						Rect pivotRect = new Rect(0f, 0f, snapPivot.fixedWidth, snapPivot.fixedHeight);
+						pivotRect.center = snapLoc;
+						snapPivot.Draw(pivotRect, false, false, false, false);
+					}
+				}
+			}
 		}
 		else if (guiEvent.isScrollWheel && (EditorWindow.mouseOverWindow == this))
 		{
 			float zoomFactor = HandleUtility.niceMouseDeltaZoom;
-			renderUtil.camera.orthographicSize *= (1 - zoomFactor * .02f);
-
-			// Update matrix from mouse to shape space
-			mouseToShapeScale = renderUtil.camera.orthographicSize * 2f / viewRect.height;
-			mouseToShapeMatrix =
-				Matrix2D.Translate(renderUtil.camera.transform.position) *
-		        Matrix2D.Scale(new Vector2(mouseToShapeScale, -mouseToShapeScale)) *
-				Matrix2D.Translate(-viewRect.center);
+			float orthographicSize = renderUtil.camera.orthographicSize * (1 - zoomFactor * .02f);
+			SetCameraSize(orthographicSize);
 
 			handled = true;
 		}
 		else if (guiEvent.isMouse)
 		{
-			// Update mouse position and matrix from mouse to shape space
-			mouseToShapeScale = renderUtil.camera.orthographicSize * 2f / viewRect.height;
+			// Update mouse position
 			mousePosition = guiEvent.mousePosition;
-			mouseToShapeMatrix =
-				Matrix2D.Translate(renderUtil.camera.transform.position) *
-		        Matrix2D.Scale(new Vector2(mouseToShapeScale, -mouseToShapeScale)) *
-            	Matrix2D.Translate(-viewRect.center);
-
 			mouseInContent = (viewRect.Contains(mousePosition));
 
-			if (activeViewTool != ViewTool.None)
+			switch (action)
 			{
-				handled = OnViewToolMouse(guiEvent);
-			}
-			else switch (activeTool)
-			{
-				case ToolSet.Select:
+				case ActionType.ViewPan:
+				case ActionType.ViewZoom:
+					handled = OnViewToolMouse(guiEvent);
+					break;
+				case ActionType.SelectNormal:
+				case ActionType.SelectAdditive:
+				case ActionType.SelectSubtractive:
 					handled = OnSelectToolMouse(guiEvent);
 					break;
-				case ToolSet.Brush:
+				case ActionType.LineEdit:
+				case ActionType.CurveEdit:
 					handled = OnBrushToolMouse(guiEvent);
 					break;
-				case ToolSet.Shape:
+				case ActionType.ShapeEdit:
 					handled = OnShapeToolMouse(guiEvent);
 					break;
+				case ActionType.SetOrigin:
+					handled = OnSetOriginMouse(guiEvent);
+					break;
+				//case ActionType.ChangeScale:
+					//handled = OnChangeScaleMouse(guiEvent);
+					//break;
 			}
 
 			if (!handled)
@@ -736,6 +944,11 @@ public class VectorShapeEditor : EditorWindow
 			}
 		}
 
+		if (action == ActionType.ChangeScale)
+		{
+			handled = OnChangeScaleGUI(guiEvent);
+		}
+
 		if (handled)
 		{
 			guiEvent.Use();
@@ -744,16 +957,18 @@ public class VectorShapeEditor : EditorWindow
 
 	protected bool OnViewToolMouse(Event guiEvent)
 	{
-		if (guiEvent.type == EventType.MouseDrag)
+		if (mouseInContent && (guiEvent.type == EventType.MouseDrag))
 		{
-			if ((activeViewTool == ViewTool.Pan) && mouseInContent)
+			if (action == ActionType.ViewPan)
 			{
-				renderUtil.camera.transform.position += (Vector3)(guiEvent.delta * new Vector2(-mouseToShapeScale, mouseToShapeScale));
+				Vector2 cameraPos = (Vector2)renderUtil.camera.transform.position + guiEvent.delta * new Vector2(-mouseToShapeScale, mouseToShapeScale);
+				SetCameraPosition(cameraPos);
 			}
-			else if (activeViewTool == ViewTool.Zoom)
+			else if (action == ActionType.ViewZoom)
 			{
 				float zoomFactor = HandleUtility.niceMouseDeltaZoom;
-				renderUtil.camera.orthographicSize *= (1 + zoomFactor * .005f);
+				float cameraSize = renderUtil.camera.orthographicSize * (1 + zoomFactor * .005f);
+				SetCameraSize(cameraSize);
 			}
 		}
 
@@ -816,7 +1031,7 @@ public class VectorShapeEditor : EditorWindow
 			PolyShape activeLine = focusedShape as PolyShape;
 			if (activeLine == null)
 			{
-				PolyShape newLine = new PolyShape(new Vector2[] { shapePosition });
+				PolyShape newLine = PolyShape.Create(new Vector2[] { shapePosition });
 				newLine.colorOutline = shapeOutlineColor;
 				newLine.colorFill = shapeFillColor;
 				SetFocusedShape(newLine);
@@ -907,7 +1122,7 @@ public class VectorShapeEditor : EditorWindow
 		{
 			Vector2 shapePosition = MouseToShapePoint(mousePosition);
 
-			PointShape newPoint = new PointShape(shapePosition);
+			PointShape newPoint = PointShape.Create(shapePosition);
 			newPoint.colorOutline = shapeOutlineColor;
 			newPoint.colorFill = shapeFillColor;
 			SetFocusedShape(newPoint);
@@ -922,7 +1137,7 @@ public class VectorShapeEditor : EditorWindow
 
 		if (guiEvent.type == EventType.MouseDown)
 		{
-			CircleShape newCircle = new CircleShape(shapePosition, 0f);
+			CircleShape newCircle = CircleShape.Create(shapePosition, 0f);
 			newCircle.colorOutline = shapeOutlineColor;
 			newCircle.colorFill = shapeFillColor;
 			SetFocusedShape(newCircle);
@@ -949,7 +1164,7 @@ public class VectorShapeEditor : EditorWindow
 
 		if (guiEvent.type == EventType.MouseDown)
 		{
-			PolyShape newPoly = new PolyShape(shapePosition, minPolyRadius, sides);
+			PolyShape newPoly = PolyShape.Create(shapePosition, minPolyRadius, sides);
 			newPoly.colorOutline = shapeOutlineColor;
 			newPoly.colorFill = shapeFillColor;
 			SetFocusedShape(newPoly);
@@ -982,7 +1197,7 @@ public class VectorShapeEditor : EditorWindow
 
 		if (guiEvent.type == EventType.MouseDown)
 		{
-			PolyShape newRect = new PolyShape(shapePosition, 0f, 4);
+			PolyShape newRect = PolyShape.Create(shapePosition, 0f, 4);
 			newRect.colorOutline = shapeOutlineColor;
 			newRect.colorFill = shapeFillColor;
 			SetFocusedShape(newRect);
@@ -1015,7 +1230,7 @@ public class VectorShapeEditor : EditorWindow
 				Vector2[] points = new Vector2[1];
 				points[0] = shapePosition;
 
-				PolyShape newPoly = new PolyShape(points);
+				PolyShape newPoly = PolyShape.Create(points);
 				SetFocusedShape(newPoly);
 			}
 			else
@@ -1030,6 +1245,105 @@ public class VectorShapeEditor : EditorWindow
 
 			Repaint();
 		}
+	}
+
+	protected bool OnSetOriginMouse(Event guiEvent)
+	{
+		Vector2 shapePt = mouseToShapeMatrix.MultiplyPoint(guiEvent.mousePosition);
+		snapPosition = shapePt;
+		VectorShape.SnapPoint.Mode snapMode = VectorShape.SnapPoint.Mode.Center | VectorShape.SnapPoint.Mode.Endpoint;
+		float snapDistance = 10f * mouseToShapeScale;
+
+		foreach (VectorShape shape in shapes)
+		{
+			VectorShape.SnapPoint snap = shape.GetSnap(shapePt, snapMode);
+			float distance = Vector2.Distance(shapePt, snap.point);
+			if (distance < snapDistance)
+			{
+				snapDistance = distance;
+				snapPosition = snap.point;
+			}
+		}
+
+		if (guiEvent.type == EventType.MouseDown)
+		{
+			quickAction = ActionType.None;
+			showSnap = false;
+
+			foreach (VectorShape shape in shapes)
+			{
+				shape.TranslateBy(-snapPosition);
+			}
+
+			//renderUtil.camera.transform.position += (Vector3)(-snapPosition);
+			Vector2 cameraPos = (Vector2)renderUtil.camera.transform.position - snapPosition;
+			SetCameraPosition(cameraPos);
+		}
+
+		return true;
+	}
+
+	const float popupWidth = 300f;
+	const float popupHeight = 60f;
+	protected bool OnChangeScaleGUI(Event guiEvent)
+	{
+		BeginWindows();
+
+		Rect popupRect = new Rect((position.width - popupWidth) / 2f, 0f, popupWidth, popupHeight);
+		popupRect = GUI.Window(0, popupRect, OnScalePopup, GUIContent.none, GUI.skin.box);
+
+		EndWindows();
+
+		return ((guiEvent.type != EventType.Layout) && (guiEvent.type != EventType.Repaint));
+	}
+
+	protected float scaleValue = 1f;
+	protected void OnScalePopup(int id)
+	{
+		string[] scaleLables = { "Custom", "Inch to MM", "MM to Inch", "90DPI to Inch", "90DPI to MM" };
+		float[] scaleValues = { scaleValue, 25.4f, (1f / 25.4f), (1f / 90f), (25.4f / 90f)};
+		EditorGUILayout.BeginVertical();
+		EditorGUILayout.BeginHorizontal();
+		scaleValue = EditorGUILayout.FloatField("Scale shapes by", scaleValue);
+		int conversion = 0;
+		for (int i = 1; i < scaleValues.Length; i++)
+		{
+			if (Mathf.Approximately(scaleValue, scaleValues[i]))
+			{
+				conversion = i;
+				break;
+			}
+		}
+		conversion = EditorGUILayout.Popup(conversion, scaleLables);
+		if (conversion != 0)
+		{
+			scaleValue = scaleValues[conversion];
+		}
+		EditorGUILayout.EndHorizontal();
+
+		GUILayout.Space(toolbarPadding);
+
+		EditorGUILayout.BeginHorizontal();
+		GUILayout.FlexibleSpace();
+		if (GUILayout.Button("Cancel"))
+		{
+			quickAction = ActionType.None;
+		}
+		if (GUILayout.Button("Scale"))
+		{
+			foreach (VectorShape shape in shapes)
+			{
+				shape.ScaleBy(scaleValue);
+			}
+
+			Vector2 cameraPos = (Vector2)renderUtil.camera.transform.position * scaleValue;
+			float cameraSize = renderUtil.camera.orthographicSize * scaleValue;
+			SetCameraView(cameraSize, cameraPos);
+
+			quickAction = ActionType.None;
+		}
+		EditorGUILayout.EndHorizontal();
+		EditorGUILayout.EndVertical();
 	}
 
 	protected void SetFocusedShape(VectorShape shape)
@@ -1051,68 +1365,12 @@ public class VectorShapeEditor : EditorWindow
 	public static void OpenTestWindow()
 	{
 		VectorShapeEditor testWindow = EditorWindow.GetWindow(typeof(VectorShapeEditor)) as VectorShapeEditor;
-		testWindow.titleContent.text = "Testing...";
-		/*
+		testWindow.titleContent.text = "New Shape";
 
-		PointShape testPoint = new PointShape(-2, 0);
-		testPoint.colorOutline = Color.black;
-
-		PolyShape testLine = new PolyShape(new Vector2(-1, 0), 0.4f, 4);
-		testLine.colorOutline = Color.black;
-		for (int i = 0; i < testLine.vertices.Length; i++)
-		{
-			testLine.vertices[i].segmentCurves = true;
-		}
-		testLine.closed = false;
-
-		CircleShape testCircle = new CircleShape(new Vector2(0, 0), 0.4f);
-		testCircle.colorOutline = Color.black;
-
-		PolyShape testPoly3 = new PolyShape(new Vector2(1, 2), 0.45f, 3);
-		testPoly3.colorOutline = Color.black;
-		PolyShape testPoly4 = new PolyShape(new Vector2(1, 1), 0.50f, 4);
-		testPoly4.colorOutline = Color.black;
-		testPoly4.RotateAround(new Vector2(1, 1), 45);
-		PolyShape testPoly5 = new PolyShape(new Vector2(1, 0), 0.45f, 5);
-		testPoly5.colorOutline = Color.black;
-		PolyShape testPoly6 = new PolyShape(new Vector2(1, -1), 0.45f, 6);
-		testPoly6.colorOutline = Color.black;
-		testPoly6.RotateAround(new Vector2(1, -1), 30);
-
-		PolyShape testShape = new PolyShape(new Vector2(2, 0), 0.4f, 4);
-		testShape.colorOutline = Color.black;
-		for (int i = 0; i < testShape.vertices.Length; i++)
-		{
-			testShape.vertices[i].segmentCurves = true;
-		}
-
-		testWindow.Shapes = new List<VectorShape>() { testPoint, testLine, testCircle, testPoly3, testPoly4, testPoly5, testPoly6, testShape };
-		testWindow.Focus();
-
-		string tempPath = Application.dataPath + "/test.svg";
-		System.IO.Stream stream = new System.IO.FileStream(tempPath, System.IO.FileMode.OpenOrCreate);
-		VectorShapeSVGExporter exporter = new VectorShapeSVGExporter();
-		Rect bounds = new Rect(-5, -5, 10, 10);
-		exporter.Open(stream, bounds, VectorShapeSVGExporter.Unit.Centimeters);
-		exporter.AddShapeGroup(testWindow.Shapes, "TestGroup");
-		exporter.Close();
-		stream.Close();
-		*/
-
-		//EllipseShape testEllipse = new EllipseShape(Vector2.zero, 1f, 2f, 22.5f);
-		//testEllipse.colorOutline = Color.green;
-		//PolyShape testRect = new PolyShape(testEllipse.ShapeBounds);
-		//testWindow.Shapes = new List<VectorShape>() { testEllipse, testRect };
-
-		//TextAsset asset = Resources.Load("Flipper_Left_SVG") as TextAsset;
-		//testWindow.Shapes = VectorShapeFilesSVG.ReadSVG(new System.IO.StringReader(asset.text));
-
-		//TextAsset asset = Resources.Load("InlineDrop_DXF") as TextAsset;
-		//TextAsset asset = Resources.Load("Saucer_DXF") as TextAsset;
-		//TextAsset asset = Resources.Load("LaneGuide_1500_DXF") as TextAsset;
-		TextAsset asset = Resources.Load("Playfield_DXF") as TextAsset;
-		//TextAsset asset = Resources.Load("ThreeTarget_DXF") as TextAsset;
-		testWindow.Shapes = VectorShapeFilesDXF.ReadDXF(new System.IO.MemoryStream(asset.bytes));
+		EllipseShape testEllipse = new EllipseShape(Vector2.one, 1f, 2f, 22.5f);
+		testEllipse.colorOutline = Color.green;
+		PolyShape testRect = new PolyShape(testEllipse.ShapeBounds);
+		testWindow.Shapes = new List<VectorShape>() { testEllipse, testRect };
 
 		testWindow.Focus();
 	}

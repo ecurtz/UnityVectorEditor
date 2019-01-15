@@ -73,6 +73,10 @@ public class PolyShape : VectorShape
 	public Vertex.Component activeComponent = Vertex.Component.None;
 #endif
 
+	protected PolyShape()
+	{
+	}
+
 	/// <summary>
 	/// New polygon start from a single origin point.
 	/// </summary>
@@ -230,6 +234,195 @@ public class PolyShape : VectorShape
 		}
 	}
 
+	protected static PolyShape Create()
+	{
+		//PolyShape shape = ScriptableObject.CreateInstance<PolyShape>();
+		PolyShape shape = new PolyShape();
+
+		return shape;
+	}
+
+	/// <summary>
+	/// New polygon start from a single origin point.
+	/// </summary>
+	/// <param name="point">Starting point for polygon</param>
+	public static PolyShape Create(Vector2 point)
+	{
+		PolyShape shape = Create();
+
+		shape.vertices = new Vertex[1];
+		shape.vertices[0] = new Vertex();
+		shape.vertices[0].position = point;
+
+		shape.closed = false;
+
+		return shape;
+	}
+
+	/// <summary>
+	/// New regular n-sided polygon at location.
+	/// </summary>
+	/// <param name="center">Center of polygon</param>
+	/// <param name="radius">Size of polygon</param>
+	/// <param name="sides">Number of sides</param>
+	public static PolyShape Create(Vector2 center, float radius, int sides)
+	{
+		PolyShape shape = Create();
+
+		int vertexCount = Mathf.Max(sides, 3);
+		shape.vertices = new Vertex[vertexCount];
+
+		for (int i = 0; i < vertexCount; i++)
+		{
+			shape.vertices[i] = new Vertex();
+			float angle = Mathf.PI * 2f * ((float)i / vertexCount);
+			shape.vertices[i].position.x = center.x + Mathf.Sin(angle) * radius;
+			shape.vertices[i].position.y = center.y + Mathf.Cos(angle) * radius;
+		}
+
+		for (int i = 0; i < vertexCount; i++)
+		{
+			shape.InitializeControlPoints(i);
+		}
+
+		return shape;
+	}
+
+	/// <summary>
+	/// New shape from a rectangle.
+	/// </summary>
+	/// <param name="rectangle">Rectangle</param>
+	public static PolyShape Create(Rect rectangle)
+	{
+		PolyShape shape = Create();
+
+		int vertexCount = 4;
+		shape.vertices = new Vertex[vertexCount];
+		for (int i = 0; i < vertexCount; i++)
+		{
+			shape.vertices[i] = new Vertex();
+		}
+
+		shape.vertices[0].position.x = rectangle.xMin;
+		shape.vertices[0].position.y = rectangle.yMin;
+		shape.vertices[1].position.x = rectangle.xMax;
+		shape.vertices[1].position.y = rectangle.yMin;
+		shape.vertices[2].position.x = rectangle.xMax;
+		shape.vertices[2].position.y = rectangle.yMax;
+		shape.vertices[3].position.x = rectangle.xMin;
+		shape.vertices[3].position.y = rectangle.yMax;
+
+		shape.closed = true;
+
+		for (int i = 0; i < vertexCount; i++)
+		{
+			shape.InitializeControlPoints(i);
+		}
+
+		return shape;
+	}
+
+	/// <summary>
+	/// New shape from array of points.
+	/// </summary>
+	/// <param name="points">Array of vertex positions</param>
+	/// <param name="curve">Do the segments curve?</param>
+	public static PolyShape Create(Vector2[] points, bool curve = false, bool close = false)
+	{
+		PolyShape shape = Create();
+
+		int vertexCount = points.Length;
+		shape.vertices = new Vertex[vertexCount];
+
+		for (int i = 0; i < vertexCount; i++)
+		{
+			shape.vertices[i] = new Vertex();
+			shape.vertices[i].position = points[i];
+			shape.vertices[i].segmentCurves = curve;
+		}
+
+		for (int i = 0; i < vertexCount; i++)
+		{
+			shape.InitializeControlPoints(i);
+		}
+
+		shape.closed = close;
+
+		return shape;
+	}
+
+	/// <summary>
+	/// New PolyShape from Unity contour data.
+	/// </summary>
+	/// <param name="contour">Contour data</param>
+	public static PolyShape Create(BezierContour contour)
+	{
+		PolyShape shape = Create();
+
+		int vertexCount = contour.Segments.Length;
+		shape.vertices = new Vertex[vertexCount];
+
+		for (int i = 0; i < vertexCount; i++)
+		{
+			shape.vertices[i] = new Vertex();
+		}
+		for (int i = 0; i < vertexCount; i++)
+		{
+			BezierPathSegment segment = contour.Segments[i];
+			shape.vertices[i].position = segment.P0;
+			shape.vertices[i].exitCP = segment.P1;
+			shape.vertices[shape.NextIndex(i)].enterCP = segment.P2;
+			shape.vertices[i].segmentCurves = true;
+		}
+
+		shape.closed = contour.Closed;
+
+		return shape;
+	}
+
+
+	/// <summary>
+	/// New PolyShape from Unity shape data.
+	/// </summary>
+	/// <param name="unityShape">Shape data</param>
+	/// <param name="shapeTransform">Transform matrix</param>
+	public static PolyShape Create(Shape unityShape, Matrix2D shapeTransform)
+	{
+		PolyShape shape = Create();
+
+		int vertexCount = 0;
+		foreach (BezierContour contour in unityShape.Contours)
+		{
+			vertexCount += contour.Segments.Length;
+		}
+		shape.vertices = new Vertex[vertexCount];
+		for (int i = 0; i < vertexCount; i++)
+		{
+			shape.vertices[i] = new Vertex();
+		}
+
+		foreach (BezierContour contour in unityShape.Contours)
+		{
+			for (int i = 0; i < contour.Segments.Length; i++)
+			{
+				BezierPathSegment segment = contour.Segments[i];
+				shape.vertices[i].position = shapeTransform.MultiplyPoint(segment.P0);
+				shape.vertices[i].exitCP = shapeTransform.MultiplyPoint(segment.P1);
+				shape.vertices[shape.NextIndex(i)].enterCP = shapeTransform.MultiplyPoint(segment.P2);
+				shape.vertices[i].segmentCurves = true;
+			}
+
+			shape.closed = contour.Closed;
+		}
+
+		if (unityShape.PathProps.Stroke != null)
+		{
+			shape.colorOutline = unityShape.PathProps.Stroke.Color;
+		}
+
+		return shape;
+	}
+
 	/// <summary>
 	/// Vertex index preceeding given index.
 	/// </summary>
@@ -279,6 +472,12 @@ public class PolyShape : VectorShape
 	/// <param name="pt">New vertex position</param>
 	public void LineTo(Vector2 pt)
 	{
+		if (vertices.Length == 0)
+		{
+			Debug.LogWarning("LineTo with no starting vertex.");
+			return;
+		}
+
 		if (closed)
 		{
 			Debug.LogWarning("Appending vertices to closed PolyShape.");
@@ -289,7 +488,7 @@ public class PolyShape : VectorShape
 		System.Array.Resize(ref vertices, vertices.Length + 1);
 		vertices[index] = new Vertex();
 		vertices[index].position = pt;
-		vertices[index].segmentCurves = false;
+		vertices[index - 1].segmentCurves = false;
 
 		Dirty = true;
 	}
@@ -354,6 +553,12 @@ public class PolyShape : VectorShape
 	/// <param name="offset">Amount arc center if offset from segment</param>
 	protected void ArcTo(Vector2 pt, float sweepRads, float offset)
 	{
+		if (vertices.Length == 0)
+		{
+			Debug.LogWarning("ArcTo with no starting vertex.");
+			return;
+		}
+
 		if (closed)
 		{
 			Debug.LogWarning("Appending vertices to closed PolyShape.");
@@ -418,7 +623,8 @@ public class PolyShape : VectorShape
 		float distance = Mathf.Infinity;
 		float segDist;
 
-		for (int i = 0; i < vertices.Length; i++)
+		int count = closed ? vertices.Length : vertices.Length - 1;
+		for (int i = 0; i < count; i++)
 		{
 			Vertex vert = vertices[i];
 			Vertex vertNext = vertices[NextIndex(i)];
@@ -492,8 +698,6 @@ public class PolyShape : VectorShape
 	{
 		Matrix2D matrix = Matrix2D.Translate(center) * Matrix2D.Rotate(angle * Mathf.Deg2Rad) * Matrix2D.Translate(-center);
 		TransformBy(matrix);
-
-		Dirty = true;
 	}
 
 	/// <summary>
@@ -504,8 +708,22 @@ public class PolyShape : VectorShape
 	{
 		Matrix2D matrix = Matrix2D.Translate(offset);
 		TransformBy(matrix);
+	}
 
-		Dirty = true;
+	/// <summary>
+	/// Change the size of the shape.
+	/// </summary>
+	/// <param name="scale">Scaling factor to apply</param>
+	public override void ScaleBy(float scale)
+	{
+		if (scale < Mathf.Epsilon)
+		{
+			Debug.LogWarning("Scale must be greater than zero.");
+			return;
+		}
+
+		Matrix2D matrix = Matrix2D.Scale(new Vector2(scale, scale));
+		TransformBy(matrix);
 	}
 
 	/// <summary>
@@ -523,6 +741,109 @@ public class PolyShape : VectorShape
 		}
 
 		Dirty = true;
+	}
+
+	/// <summary>
+	/// Distance between a point and the shape.
+	/// </summary>
+	/// <param name="pt">Test point</param>
+	/// <param name="mode">Snap modes to consider</param>
+	/// <returns>Distance from point to nearest point on shape</returns>
+	public override SnapPoint GetSnap(Vector2 pt, SnapPoint.Mode mode)
+	{
+		SnapPoint snap = new SnapPoint();
+		float distance = float.MaxValue;
+
+		if ((mode & SnapPoint.Mode.Center) != 0)
+		{
+			if (closed && (vertices.Length > 0))
+			{
+				Vector2 center = new Vector2();
+				for (int i = 0; i < vertices.Length; i++)
+				{
+					center += vertices[i].position;
+				}
+
+				center /= vertices.Length;
+				float d = Vector2.Distance(pt, center);
+				if (d < distance)
+				{
+					distance = d;
+					snap.mode = SnapPoint.Mode.Center;
+					snap.point = center;
+				}
+			}
+		}
+
+		if ((mode & SnapPoint.Mode.Endpoint) != 0)
+		{
+			for (int i = 0; i < vertices.Length; i++)
+			{
+				float d = Vector2.Distance(pt, vertices[i].position);
+				if (d < distance)
+				{
+					distance = d;
+					snap.mode = SnapPoint.Mode.Endpoint;
+					snap.point = vertices[i].position;
+				}
+			}
+		}
+
+		if ((mode & SnapPoint.Mode.Midpoint) != 0)
+		{
+			int count = closed ? vertices.Length : vertices.Length - 1;
+			for (int i = 0; i < count; i++)
+			{
+				Vertex vert = vertices[i];
+				Vertex vertNext = vertices[NextIndex(i)];
+				Vector2 midPoint;
+
+				if (vertices[i].segmentCurves)
+				{
+					midPoint = VectorShapeUtils.EvaluateCubicCurve(vert.position, vert.exitCP, vertNext.enterCP, vertNext.position, 0.5f);
+				}
+				else
+				{
+					midPoint = (vert.position + vertNext.position) / 2f;
+				}
+				float d = Vector2.Distance(pt, midPoint);
+				if (d < distance)
+				{
+					distance = d;
+					snap.mode = SnapPoint.Mode.Midpoint;
+					snap.point = midPoint;
+				}
+			}
+		}
+
+		if ((mode & SnapPoint.Mode.Edge) != 0)
+		{
+			int count = closed ? vertices.Length : vertices.Length - 1;
+			for (int i = 0; i < count; i++)
+			{
+				Vertex vert = vertices[i];
+				Vertex vertNext = vertices[NextIndex(i)];
+				Vector2 closest;
+
+				if (vertices[i].segmentCurves)
+				{
+					closest = VectorShapeUtils.ClosetPointOnBezierCurve(pt, vert.position, vert.exitCP, vertNext.enterCP, vertNext.position);
+				}
+				else
+				{
+					closest = VectorShapeUtils.ClosestPointOnLineSegment(pt, vert.position, vertNext.position);
+				}
+				float d = Vector2.Distance(pt, closest);
+				if (d < distance)
+				{
+					distance = d;
+					snap.mode = SnapPoint.Mode.Edge;
+					snap.point = closest;
+				}
+			}
+		}
+
+		return snap;
 	}
 
 	/// <summary>
@@ -547,7 +868,7 @@ public class PolyShape : VectorShape
 				Stroke = new Stroke()
 				{
 					Color = colorOutline,
-					HalfThickness = penSize / Screen.dpi
+					HalfThickness = penSize / 2f * penToMeshScale
 				}
 			}
 		};
@@ -800,6 +1121,8 @@ public class PolyShape : VectorShape
 	/// <param name="active">Is it the active shape?</param>
 	public override void DrawEditorHandles(bool selected, bool active = false)
 	{
+		base.DrawEditorHandles(selected, active);
+
 		/*
 		Vector2 midPoint = new Vector2();
 		for (int i = 0; i < vertices.Length; i++)

@@ -10,19 +10,36 @@ using Unity.VectorGraphics;
 /// <summary>
 /// Vector point.
 /// </summary>
-public class PointShape : VectorShape
+public class TextShape : VectorShape
 {
 	/// <summary>
-	/// Visual size of point.
-	/// </summary>
-	public float pointRadius = 0.1f;
-
-	/// <summary>
-	/// Position of point.
+	/// Position of text origin.
 	/// </summary>
 	public Vector2 position;
 
-	protected PointShape()
+	/// <summary>
+	/// Rotation of text (in degrees).
+	/// </summary>
+	public float rotation;
+
+	/// <summary>
+	/// Text.
+	/// </summary>
+	public string text;
+
+	/// <summary>
+	/// Font.
+	/// </summary>
+	[SerializeField]
+	protected string font;
+
+	/// <summary>
+	/// Font size.
+	/// </summary>
+	[SerializeField]
+	protected int size;
+
+	protected TextShape()
 	{
 	}
 
@@ -30,25 +47,17 @@ public class PointShape : VectorShape
 	/// New point from location.
 	/// </summary>
 	/// <param name="location">Position of point</param>
-	public PointShape(Vector2 location)
+	/// <param name="content">Text to display</param>
+	public TextShape(Vector2 location, string content)
 	{
 		position = location;
+		text = content;
 	}
 
-	/// <summary>
-	/// New point from coordinates.
-	/// </summary>
-	/// <param name="x">X position of point</param>
-	/// <param name="y">X position of point</param>
-	public PointShape(float x, float y)
+	public static TextShape Create()
 	{
-		position = new Vector2(x, y);
-	}
-
-	protected static PointShape Create()
-	{
-		//PointShape shape = ScriptableObject.CreateInstance<PointShape>();
-		PointShape shape = new PointShape();
+		//TextShape shape = ScriptableObject.CreateInstance<TextShape>();
+		TextShape shape = new TextShape();
 
 		return shape;
 	}
@@ -57,25 +66,13 @@ public class PointShape : VectorShape
 	/// New point from location.
 	/// </summary>
 	/// <param name="location">Position of point</param>
-	public static PointShape Create(Vector2 location)
+	/// <param name="content">Text to display</param>
+	public static TextShape Create(Vector2 location, string content)
 	{
-		PointShape shape = Create();
+		TextShape shape = Create();
 
 		shape.position = location;
-
-		return shape;
-	}
-
-	/// <summary>
-	/// New point from coordinates.
-	/// </summary>
-	/// <param name="x">X position of point</param>
-	/// <param name="y">X position of point</param>
-	public static PointShape Create(float x, float y)
-	{
-		PointShape shape = Create();
-
-		shape.position = new Vector2(x, y);
+		shape.text = content;
 
 		return shape;
 	}
@@ -172,13 +169,6 @@ public class PointShape : VectorShape
 	{
 		SnapPoint snap = new SnapPoint();
 
-		snap.point = position;
-
-		if ((mode & SnapPoint.Mode.Center) != 0) snap.mode = SnapPoint.Mode.Center;
-		else if ((mode & SnapPoint.Mode.Endpoint) != 0) snap.mode = SnapPoint.Mode.Endpoint;
-		else if ((mode & SnapPoint.Mode.Midpoint) != 0) snap.mode = SnapPoint.Mode.Midpoint;
-		else if ((mode & SnapPoint.Mode.Edge) != 0) snap.mode = SnapPoint.Mode.Edge;
-
 		return snap;
 	}
 
@@ -189,15 +179,6 @@ public class PointShape : VectorShape
 	{
 		if ((shapeGeometry != null) && (!shapeDirty)) return;
 
-		var seg1 = VectorUtils.MakePathLine(
-			new Vector2(position.x, position.y + pointRadius),
-			new Vector2(position.x, position.y - pointRadius)
-		);
-		var seg2 = VectorUtils.MakePathLine(
-			new Vector2(position.x + pointRadius, position.y),
-			new Vector2(position.x - pointRadius, position.y)
-		);
-
 		PathProperties pathProps = new PathProperties()
 		{
 			Stroke = new Stroke()
@@ -207,34 +188,20 @@ public class PointShape : VectorShape
 			}
 		};
 
-		Shape segment1 = new Shape()
+		Shape textShape = new Shape()
 		{
 			Contours = new BezierContour[]
 			{
-				new BezierContour {Segments = seg1}
 			},
 			PathProps = pathProps
 		};
-
-		Shape segment2 = new Shape()
-		{
-			Contours = new BezierContour[]
-			{
-				new BezierContour {Segments = seg2}
-			},
-			PathProps = pathProps
-		};
-
-		Shape circle = new Shape();
-		VectorUtils.MakeCircleShape(circle, position, pointRadius);
-		circle.PathProps = pathProps;
 
 		shapeNode = new SceneNode()
 		{
 			Transform = matrixTransform,
 			Shapes = new List<Shape>
 			{
-				segment1, segment2, circle
+				textShape
 			}
 		};
 
@@ -276,7 +243,6 @@ public class PointShape : VectorShape
 		}
 
 		collider.offset = position;
-		collider.radius = pointRadius;
 	}
 
 	/// <summary>

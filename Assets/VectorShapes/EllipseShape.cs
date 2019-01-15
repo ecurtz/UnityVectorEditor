@@ -6,9 +6,14 @@ using UnityEditor;
 #endif
 using Unity.VectorGraphics;
 
+/// <remarks>
+/// Ellipse equations are taken from Luc Maisonobe's
+/// "Quick computation of the distance between a point and an ellipse"
+/// </remarks>
+
 [System.Serializable]
 /// <summary>
-/// Vector circle.
+/// Vector ellipse.
 /// </summary>
 public class EllipseShape : VectorShape
 {
@@ -149,6 +154,10 @@ public class EllipseShape : VectorShape
 		}
 	}
 
+	protected EllipseShape()
+	{
+	}
+
 	/// <summary>
 	/// New ellipse from center point and axis radii (SVG format).
 	/// </summary>
@@ -219,6 +228,160 @@ public class EllipseShape : VectorShape
 		}
 	}
 
+	protected static EllipseShape Create()
+	{
+		//EllipseShape shape = ScriptableObject.CreateInstance<EllipseShape>();
+		EllipseShape shape = new EllipseShape();
+
+		return shape;
+	}
+
+	/// <summary>
+	/// New ellipse from center point and axis radii (SVG format).
+	/// </summary>
+	/// <param name="center">Center of circle</param>
+	/// <param name="radX">Radius of ellipse on X axis</param>
+	/// <param name="radY">Radius of ellipse on Y axis</param>
+	/// <param name="rotation">Rotation from x-axis (in degrees)</param>
+	public static EllipseShape Create(Vector2 center, float radX, float radY, float rotation = 0f)
+	{
+		EllipseShape shape = Create();
+
+		shape.position = center;
+		if (radX >= radY)
+		{
+			shape.majorAxis = Vector2.right * radX;
+			shape.eccentricity = Mathf.Sin(Mathf.Atan2(radX, radY));
+		}
+		else
+		{
+			shape.majorAxis = Vector2.up * radY;
+			shape.eccentricity = Mathf.Sin(Mathf.Atan2(radY, radX));
+		}
+
+		shape.majorAxis = Matrix2D.Rotate(-rotation * Mathf.Deg2Rad).MultiplyVector(shape.majorAxis);
+
+		return shape;
+	}
+
+	/// <summary>
+	/// New ellipse from center point, major axis, and minor axis ratio (DXF format).
+	/// </summary>
+	/// <param name="center">Center of circle</param>
+	/// <param name="major">Major axis of the ellipse</param>
+	/// <param name="ratio">Ratio of minor axis to major axis</param>
+	public static EllipseShape Create(Vector2 center, Vector2 major, float ratio)
+	{
+		EllipseShape shape = Create();
+
+		shape.position = center;
+		shape.majorAxis = major;
+		float majorLength = major.magnitude;
+		float minorLength = major.magnitude * ratio;
+
+		shape.eccentricity = Mathf.Sqrt((majorLength * majorLength) - (minorLength * minorLength)) / majorLength;
+
+		return shape;
+	}
+
+	/// <summary>
+	/// New elliptical arc from center point, major axis, minor axis ration, and angles.
+	/// </summary>
+	/// <param name="center">Center of circle</param>
+	/// <param name="major">Major axis of the ellipse</param>
+	/// <param name="ratio">Ratio of minor axis to major axis</param>
+	/// <param name="angle">Starting angle of arc (in degrees)</param>
+	/// <param name="sweep">Sweep of arc (in degrees)</param>
+	public static EllipseShape Create(Vector2 center, Vector2 major, float ratio, float angle, float sweep)
+	{
+		EllipseShape shape = Create();
+
+		shape.position = center;
+		shape.majorAxis = major;
+		float majorLength = major.magnitude;
+		float minorLength = major.magnitude * ratio;
+
+		shape.eccentricity = Mathf.Sqrt((majorLength * majorLength) - (minorLength * minorLength)) / majorLength;
+
+		shape.startAngle = angle * Mathf.Deg2Rad;
+		shape.sweepAngle = sweep * Mathf.Deg2Rad;
+
+		if (Mathf.Approximately(sweep, 0f) || (Mathf.Abs(sweep) >= 360f))
+		{
+			shape.closed = true;
+		}
+		else
+		{
+			shape.closed = false;
+		}
+
+		return shape;
+	}
+
+	private static Vector2 ClosestEllipsePoint(Vector2 point, float semiMajor, float semiMinor)
+	{
+		Vector2 p = new Vector2(Mathf.Abs(point.x), Mathf.Abs(point.y));
+
+		float t = Mathf.PI / 4;
+
+		float a = semiMajor;
+		float b = semiMinor;
+
+		Vector2 pt;
+
+		float cosT, sinT, deltaC, deltaT;
+		Vector2 e; Vector2 r; Vector2 q;
+
+		for (int i = 0; i < 3; i++)
+		{
+			cosT = Mathf.Cos(t);
+			sinT = Mathf.Sin(t);
+
+			pt.x = a * cosT;
+			pt.y = b * sinT;
+
+			e.x = (a * a - b * b) * (cosT * cosT * cosT) / a;
+			e.y = (b * b - a * a) * (sinT * sinT * sinT) / b;
+
+			r = pt - e;
+			q = p - e;
+
+			deltaC = r.magnitude * Mathf.Asin((r.x * q.y - r.y * q.x) / (r.magnitude * q.magnitude));
+			deltaT = deltaC / Mathf.Sqrt(a * a + b * b - pt.sqrMagnitude);
+
+			t += deltaT;
+			t = Mathf.Clamp(t, 0f, Mathf.PI / 2);
+		}
+
+		pt.x = a * Mathf.Cos(t) * Mathf.Sign(point.x);
+		pt.y = b * Mathf.Sin(t) * Mathf.Sign(point.y);
+
+		return pt;
+	}
+
+	/// <summary>
+	/// Closest point on the shape to a point.
+	/// </summary>
+	/// <param name="pt">Test point</param>
+	/// <returns>Closest point on shape</returns>
+	public Vector2 ClosestPoint(Vector2 pt)
+	{
+		float theta = Mathf.Atan2(MajorAxis.y, MajorAxis.x);
+
+		Vector2 major = MajorAxis;
+		Vector2 minor = MinorAxis;
+
+		Matrix2D matrix = Matrix2D.Rotate(theta) * Matrix2D.Translate(-position);
+
+		Vector2 standardPt = matrix.MultiplyPoint(pt);
+
+		Vector2 closestPt = ClosestEllipsePoint(standardPt, major.magnitude, minor.magnitude);
+
+		closestPt = matrix.Inverse().MultiplyPoint(closestPt);
+
+		return closestPt;
+	}
+
 	/// <summary>
 	/// Distance between a point and the shape.
 	/// </summary>
@@ -226,13 +389,9 @@ public class EllipseShape : VectorShape
 	/// <returns>Distance from point to nearest point on shape</returns>
 	public override float Distance(Vector2 pt)
 	{
-		Vector2 focus1 = position + majorAxis * eccentricity;
-		Vector2 focus2 = position - majorAxis * eccentricity;
+		Vector2 closest = ClosestPoint(pt);
 
-		float distance1 = Vector2.Distance(pt, focus1);
-		float distance2 = Vector2.Distance(pt, focus2);
-		// HACK - this is not correct
-		return ((distance1 + distance2) - (majorAxis.magnitude * 2f));
+		return Vector2.Distance(pt, closest);
 	}
 
 	/// <summary>
@@ -305,31 +464,129 @@ public class EllipseShape : VectorShape
 	}
 
 	/// <summary>
+	/// Change the size of the shape.
+	/// </summary>
+	/// <param name="scale">Scaling factor to apply</param>
+	public override void ScaleBy(float scale)
+	{
+		if (scale < Mathf.Epsilon)
+		{
+			Debug.LogWarning("Scale must be greater than zero.");
+			return;
+		}
+
+		position *= scale;
+		majorAxis *= scale;
+
+		Dirty = true;
+	}
+
+	/// <summary>
+	/// Distance between a point and the shape.
+	/// </summary>
+	/// <param name="pt">Test point</param>
+	/// <param name="mode">Snap modes to consider</param>
+	/// <returns>Distance from point to nearest point on shape</returns>
+	public override SnapPoint GetSnap(Vector2 pt, SnapPoint.Mode mode)
+	{
+		SnapPoint snap = new SnapPoint();
+		float distance = float.MaxValue;
+
+		if ((mode & SnapPoint.Mode.Center) != 0)
+		{
+			Vector2[] centerPoints =
+			{
+				position,
+				position + majorAxis * eccentricity,
+				position - majorAxis * eccentricity,
+			};
+
+			foreach (Vector2 testPt in centerPoints)
+			{
+				float d = Vector2.Distance(pt, testPt);
+				if (d < distance)
+				{
+					distance = d;
+					snap.mode = SnapPoint.Mode.Midpoint;
+					snap.point = testPt;
+				}
+			}
+		}
+
+		if ((mode & SnapPoint.Mode.Midpoint) != 0)
+		{
+			Vector2[] midPoints =
+			{
+				position + majorAxis,
+				position + MinorAxis,
+				position - majorAxis,
+				position - MinorAxis,
+			};
+
+			foreach (Vector2 testPt in midPoints)
+			{
+				float d = Vector2.Distance(pt, testPt);
+				if (d < distance)
+				{
+					distance = d;
+					snap.mode = SnapPoint.Mode.Midpoint;
+					snap.point = testPt;
+				}
+			}
+		}
+
+		if ((mode & SnapPoint.Mode.Edge) != 0)
+		{
+			Vector2 closest = ClosestPoint(pt);
+			float d = Vector2.Distance(pt, closest);
+
+			if (d < distance)
+			{
+				distance = d;
+				snap.mode = SnapPoint.Mode.Edge;
+				snap.point = closest;
+			}
+		}
+
+		return snap;
+	}
+
+	/// <summary>
 	/// Tessellate the shape into geometry data.
 	/// </summary>
 	protected override void GenerateGeometry()
 	{
 		if ((shapeGeometry != null) && (!shapeDirty)) return;
 
-		Shape ellipse = new Shape();
 		float theta = Mathf.Atan2(MajorAxis.y, MajorAxis.x);
-		VectorUtils.MakeEllipseShape(ellipse, Vector2.zero, MajorAxis.magnitude, MinorAxis.magnitude);
 
-		ellipse.PathProps = new PathProperties()
-		{
-			Stroke = new Stroke()
-			{
-				Color = colorOutline,
-				HalfThickness = penSize / Screen.dpi
-			}
-		};
-		if (colorFill != Color.clear)
-		{
-			ellipse.Fill = new SolidFill()
-			{
-				Color = colorFill
-			};
-		}
+		//Shape ellipse = new Shape();
+		//VectorUtils.MakeEllipseShape(ellipse, Vector2.zero, MajorAxis.magnitude, MinorAxis.magnitude);
+
+		//ellipse.PathProps = new PathProperties()
+		//{
+		//	Stroke = new Stroke()
+		//	{
+		//		Color = colorOutline,
+		//		HalfThickness = penSize / 2f * penToMeshScale
+		//	}
+		//};
+		//if (colorFill != Color.clear)
+		//{
+		//	ellipse.Fill = new SolidFill()
+		//	{
+		//		Color = colorFill
+		//	};
+		//}
+
+		//shapeNode = new SceneNode()
+		//{
+		//	Transform = matrixTransform * Matrix2D.Translate(position) * Matrix2D.Rotate(-theta),
+		//	Shapes = new List<Shape>
+		//	{
+		//		ellipse
+		//	}
+		//};
 
 		int numCurves = 4; // Supposed to calculate from max error
 		BezierSegment[] segments = new BezierSegment[numCurves];
@@ -380,42 +637,29 @@ public class EllipseShape : VectorShape
 			segments[i].P2.y = ptB.y - alpha * dotB.y;
 			segments[i].P3 = ptB;
 		}
-		Shape testShape = new Shape();
-		testShape.PathProps = new PathProperties()
+		Shape ellipse = new Shape();
+		ellipse.PathProps = new PathProperties()
 		{
 			Stroke = new Stroke()
 			{
-				Color = Color.red,
-				HalfThickness = penSize * 1.5f / Screen.dpi
+				Color = colorOutline,
+				HalfThickness = penSize / 2f * penToMeshScale
 			}
 		};
-		testShape.Contours = new BezierContour[1];
-		testShape.Contours[0] = new BezierContour();
-		testShape.Contours[0].Segments = VectorUtils.BezierSegmentsToPath(segments);
+		ellipse.Contours = new BezierContour[1];
+		ellipse.Contours[0] = new BezierContour();
+		ellipse.Contours[0].Segments = VectorUtils.BezierSegmentsToPath(segments);
 
 		shapeNode = new SceneNode()
 		{
-			Transform =  Matrix2D.Translate(position) * Matrix2D.Rotate(-theta),
+			Transform = matrixTransform,
 			Shapes = new List<Shape>
 			{
 				ellipse
 			}
 		};
 
-		SceneNode testNode = new SceneNode()
-		{
-			Transform = matrixTransform,
-			Shapes = new List<Shape>
-			{
-				testShape
-			},
-			Children = new List<SceneNode>
-			{
-				shapeNode
-			}
-		};
-
-		tessellationScene.Root = testNode;
+		tessellationScene.Root = shapeNode;
 		shapeGeometry = VectorUtils.TessellateScene(tessellationScene, tessellationOptions);
 
 		shapeMesh = null;
@@ -486,6 +730,8 @@ public class EllipseShape : VectorShape
 	/// <param name="active">Is it the active shape?</param>
 	public override void DrawEditorHandles(bool selected, bool active = false)
 	{
+		base.DrawEditorHandles(selected, active);
+
 		/*
 		Vector3 handleP0 = new Vector3();
 		Vector3 handleP1 = new Vector3();

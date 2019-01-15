@@ -3,6 +3,21 @@
 public static class VectorShapeUtils
 {
 	/// <summary>
+	/// Union of two Rects
+	/// </summary>
+	/// <returns>The union.</returns>
+	/// <param name="rectA">Rect A</param>
+	/// <param name="rectB">Rect B</param>
+	public static Rect RectUnion(Rect rectA, Rect rectB)
+	{
+		return Rect.MinMaxRect(Mathf.Min(rectA.xMin, rectB.xMin),
+							   Mathf.Min(rectA.yMin, rectB.yMin),
+							   Mathf.Max(rectA.xMax, rectB.xMax),
+							   Mathf.Max(rectA.yMax, rectB.yMax));
+	}
+
+
+	/// <summary>
 	/// Point on a quadratic curve between pt0 and pt2.
 	/// </summary>
 	/// <param name="pt0">Starting point</param>
@@ -32,6 +47,30 @@ public static class VectorShapeUtils
 	}
 
 	/// <summary>
+	/// Closest point on a line segment to given point.
+	/// </summary>
+	/// <param name="pt">Test point</param>
+	/// <param name="segA">Start of line segment</param>
+	/// <param name="segB">End of line segment</param>
+	/// <returns>Closet point on segment</returns>
+	public static Vector2 ClosestPointOnLineSegment(Vector2 pt, Vector2 segA, Vector2 segB)
+	{
+		float segLength = (segB - segA).sqrMagnitude;
+		if (segLength < Mathf.Epsilon) // Segment is actually a point
+			return segA;
+
+		float t = Vector2.Dot(pt - segA, segB - segA) / segLength;
+		if (t < 0.0) // Beyond the 'a' end of the segment
+			return segA;
+		if (t > 1.0) // Beyond the 'b' end of the segment
+			return segB;
+
+		// Projection falls on the segment
+		Vector2 projection = segA + t * (segB - segA);
+		return projection;
+	}
+
+	/// <summary>
 	/// Distance between a point and a line segment.
 	/// </summary>
 	/// <param name="pt">Test point</param>
@@ -40,25 +79,46 @@ public static class VectorShapeUtils
 	/// <returns>Distance</returns>
 	public static float DistancePointToLineSegment(Vector2 pt, Vector2 segA, Vector2 segB)
 	{
-		float segLength = (segB - segA).sqrMagnitude;
-		if (segLength < Mathf.Epsilon) // Segment is actually a point
-			return (pt - segA).magnitude;
-
-		float t = Vector2.Dot(pt - segA, segB - segA) / segLength;
-		if (t < 0.0) // Beyond the 'a' end of the segment
-			return (pt - segA).magnitude;
-		if (t > 1.0) // Beyond the 'b' end of the segment
-			return (pt - segB).magnitude;
-
-		// Projection falls on the segment
-		Vector2 projection = segA + t * (segB - segA);
-		return (pt - projection).magnitude;
+		Vector2 closest = ClosestPointOnLineSegment(pt, segA, segB);
+		return Vector2.Distance(pt, closest);
 	}
 
 	/// <summary>
 	/// Number of steps when approximating Bezier curves.
 	/// </summary>
 	public static int bezierSteps = 12;
+
+	/// <summary>
+	/// APPROXIMATE closest point on a bezier curve segment to given point.
+	/// </summary>
+	/// <param name="pt">Test point</param>
+	/// <param name="curveA">Start of curve</param>
+	/// <param name="controlA">Control point A</param>
+	/// <param name="controlB">Control point B</param>
+	/// <param name="curveB">End of curve</param>
+	/// <returns>Closest point on the curve (approximate)</returns>
+	public static Vector2 ClosetPointOnBezierCurve(Vector2 pt, Vector2 curveA, Vector2 controlA, Vector2 controlB, Vector2 curveB)
+	{
+		Vector2 closest = curveA;
+		float sqrDistance = (pt - curveA).sqrMagnitude;
+
+		float step = 1f / bezierSteps;
+		float t = step;
+		for (int i = 1; i < bezierSteps; i++)
+		{
+			Vector2 curvePt = EvaluateCubicCurve(curveA, controlA, controlB, curveB, t);
+			float sqrDistance2 = (pt - curvePt).sqrMagnitude;
+			if (sqrDistance2 < sqrDistance)
+			{
+				sqrDistance = sqrDistance2;
+				closest = curvePt;
+			}
+
+			t += step;
+		}
+
+		return closest;
+	}
 
 	/// <summary>
 	/// Distance between a point and a Bezier curve
@@ -71,20 +131,8 @@ public static class VectorShapeUtils
 	/// <returns>Distance (approximate)</returns>
 	public static float DistancePointToBezierCurve(Vector2 pt, Vector2 curveA, Vector2 controlA, Vector2 controlB, Vector2 curveB)
 	{
-		float sqrDistance = (pt - curveA).sqrMagnitude;
+		Vector2 closest = ClosetPointOnBezierCurve(pt, curveA, controlA, curveB, controlB);
 
-		float step = 1f / bezierSteps;
-		float t = step;
-		for (int i = 1; i < bezierSteps; i++)
-		{
-			Vector2 curvePt = EvaluateCubicCurve(curveA, controlA, controlB, curveB, t);
-			float sqrDistance2 = (pt - curvePt).sqrMagnitude;
-			if (sqrDistance2 < sqrDistance)
-				sqrDistance = sqrDistance2;
-
-			t += step;
-		}
-
-		return Mathf.Sqrt(sqrDistance);
+		return Vector2.Distance(pt, closest);
 	}
 }

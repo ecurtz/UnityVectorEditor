@@ -3,17 +3,75 @@ using System.Xml;
 using UnityEngine;
 using Unity.VectorGraphics;
 
-[System.Serializable]
 /// <summary>
 /// Base class of drawable vector based 2d elements.
 /// </summary>
 public abstract class VectorShape
 {
+	public class ShapeProxy : ScriptableObject, ISerializationCallbackReceiver
+	{
+		[HideInInspector]
+		public VectorShape shape;
+
+		[Range(0f, 25f)]
+		public float penSize;
+
+		public Color colorOutline;
+		public Color colorFill;
+
+		public void OnBeforeSerialize()
+		{
+			if (shape != null)
+			{
+				shape.penSize = penSize;
+				shape.colorOutline = colorOutline;
+				shape.colorFill = colorFill;
+			}
+		}
+
+		public void OnAfterDeserialize()
+		{
+		}
+	}
+
+	public ShapeProxy GetShapeProxy()
+	{
+		ShapeProxy proxy = ScriptableObject.CreateInstance<ShapeProxy>();
+		proxy.name = "Shape";
+		proxy.shape = this;
+		proxy.penSize = penSize;
+		proxy.colorOutline = colorOutline;
+		proxy.colorFill = colorFill;
+
+		return proxy;
+	}
+
+	public class SnapPoint
+	{
+		[System.Flags]
+		public enum Mode
+		{
+			None = 0,
+			Center = 1,
+			Endpoint = 2,
+			Midpoint = 4,
+			Edge = 8
+		}
+		public Mode mode = Mode.None;
+
+		public Vector2 point;
+	}
 
 	/// <summary>
 	/// Pen size for drawing.
 	/// </summary>
-	public float penSize = 8f;
+	[Range(0f, 25f)]
+	public float penSize = 2f;
+
+	/// <summary>
+	/// Scale between pen and mesh units.
+	/// </summary>
+	public float penToMeshScale = 0.01f;
 
 	/// <summary>
 	/// Outline color.
@@ -64,7 +122,6 @@ public abstract class VectorShape
 	protected Rect shapeBounds = Rect.zero;
 
 	protected bool shapeDirty = true;
-	protected bool inverseDirty = false;
 	protected bool boundsDirty = true;
 
 	/// <summary>
@@ -108,23 +165,17 @@ public abstract class VectorShape
 	/// <summary>
 	/// Shared settings for tessellating shape meshes.
 	/// </summary>
-	protected static VectorUtils.TessellationOptions tessellationOptions;
+	public static VectorUtils.TessellationOptions tessellationOptions;
 
 	static VectorShape()
 	{
-#if UNITY_EDITOR
-		handleDrawTexture = new Texture2D(1, 2);
-		handleDrawTexture.SetPixel(0, 0, Color.white);
-		handleDrawTexture.SetPixel(0, 1, Color.clear);
-		handleDrawTexture.Apply();
-#endif
 		tessellationScene = new Scene();
 
 		tessellationOptions = new VectorUtils.TessellationOptions()
 		{
-			StepDistance = 0.05f,
+			StepDistance = 50f,
 			MaxCordDeviation = float.MaxValue,
-			MaxTanAngleDeviation = Mathf.PI / 2.0f,
+			MaxTanAngleDeviation = Mathf.PI / 16.0f,
 			SamplingStepSize = 0.05f
 		};
 	}
@@ -189,7 +240,6 @@ public abstract class VectorShape
 				shapeMesh = null;
 				shapeDirty = true;
 				boundsDirty = true;
-				inverseDirty = true;
 			}
 		}
 		get
@@ -263,6 +313,12 @@ public abstract class VectorShape
 	public abstract void TranslateBy(Vector2 offset);
 
 	/// <summary>
+	/// Change the size of the shape.
+	/// </summary>
+	/// <param name="scale">Scaling factor to apply</param>
+	public abstract void ScaleBy(float scale);
+
+	/// <summary>
 	/// Transform the shape by an arbitrary matrix.
 	/// </summary>
 	/// <param name="matrix">Matrix to transform shape</param>
@@ -278,8 +334,19 @@ public abstract class VectorShape
 		GenerateGeometry();
 
 		shapeMesh = new Mesh();
-		VectorUtils.FillMesh(shapeMesh, shapeGeometry, 1.0f);
+		if (shapeGeometry != null)
+		{
+			VectorUtils.FillMesh(shapeMesh, shapeGeometry, 1.0f);
+		}
 	}
+
+	/// <summary>
+	/// Distance between a point and the shape.
+	/// </summary>
+	/// <param name="pt">Test point</param>
+	/// <param name="mode">Snap modes to consider</param>
+	/// <returns>Distance from point to nearest point on shape</returns>
+	public abstract SnapPoint GetSnap(Vector2 pt, SnapPoint.Mode mode);
 
 	/// <summary>
 	/// Tessellate the shape into geometry data.
@@ -307,7 +374,16 @@ public abstract class VectorShape
 	/// </summary>
 	/// <param name="selected">Is the shape selected?</param>
 	/// <param name="active">Is it the active shape?</param>
-	public abstract void DrawEditorHandles(bool selected, bool active = false);
+	public virtual void DrawEditorHandles(bool selected, bool active = false)
+	{
+		if (handleDrawTexture == null)
+		{
+			handleDrawTexture = new Texture2D(1, 2);
+			handleDrawTexture.SetPixel(0, 0, Color.white);
+			handleDrawTexture.SetPixel(0, 1, Color.clear);
+			handleDrawTexture.Apply();
+		}
+	}
 
 	/// <summary>
 	/// Respond to GUI input events in editor.

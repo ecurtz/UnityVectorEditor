@@ -126,7 +126,7 @@ public class VectorShapeFilesSVG
 
 	private static VectorShape ParseContour(BezierContour contour, Matrix2D transform)
 	{
-		VectorShape vectorShape = new PolyShape(contour);
+		VectorShape vectorShape = PolyShape.Create(contour);
 		vectorShape.TransformBy(transform);
 
 		return vectorShape;
@@ -167,14 +167,14 @@ public class VectorShapeFilesSVG
 			}
 		}
 
-		CircleShape circle = new CircleShape(center, radius);
+		CircleShape circle = CircleShape.Create(center, radius);
 		circle.colorOutline = Color.red;
 		return circle;
 	}
 
 	private static VectorShape ParseShape(Shape shape, Matrix2D transform)
 	{
-		VectorShape vectorShape = new PolyShape(shape, transform);
+		VectorShape vectorShape = PolyShape.Create(shape, transform);
 
 		return vectorShape;
 	}
