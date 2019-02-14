@@ -179,7 +179,7 @@ public class EllipseShape : VectorShape
 			eccentricity = Mathf.Sin(Mathf.Atan2(radY, radX));
 		}
 
-		majorAxis = Matrix2D.Rotate(-rotation * Mathf.Deg2Rad).MultiplyVector(majorAxis);
+		majorAxis = Matrix2D.RotateRH(rotation * Mathf.Deg2Rad).MultiplyVector(majorAxis);
 	}
 
 	/// <summary>
@@ -259,7 +259,7 @@ public class EllipseShape : VectorShape
 			shape.eccentricity = Mathf.Sin(Mathf.Atan2(radY, radX));
 		}
 
-		shape.majorAxis = Matrix2D.Rotate(-rotation * Mathf.Deg2Rad).MultiplyVector(shape.majorAxis);
+		shape.majorAxis = Matrix2D.RotateRH(rotation * Mathf.Deg2Rad).MultiplyVector(shape.majorAxis);
 
 		return shape;
 	}
@@ -318,6 +318,16 @@ public class EllipseShape : VectorShape
 		return shape;
 	}
 
+	/// <summary>
+	/// Copy of the shape.
+	/// </summary>
+	/// <returns>New shape with properties of existing shape</returns>
+	public override VectorShape Duplicate()
+	{
+		float ratio = MinorAxis.magnitude / MajorAxis.magnitude;
+		return Create(position, majorAxis, ratio, startAngle * Mathf.Rad2Deg, sweepAngle * Mathf.Rad2Deg);
+	}
+
 	private static Vector2 ClosestEllipsePoint(Vector2 point, float semiMajor, float semiMinor)
 	{
 		Vector2 p = new Vector2(Mathf.Abs(point.x), Mathf.Abs(point.y));
@@ -371,7 +381,7 @@ public class EllipseShape : VectorShape
 		Vector2 major = MajorAxis;
 		Vector2 minor = MinorAxis;
 
-		Matrix2D matrix = Matrix2D.Rotate(theta) * Matrix2D.Translate(-position);
+		Matrix2D matrix = Matrix2D.RotateRH(-theta) * Matrix2D.Translate(-position);
 
 		Vector2 standardPt = matrix.MultiplyPoint(pt);
 
@@ -433,7 +443,7 @@ public class EllipseShape : VectorShape
 	/// <param name="angle">Angle in degrees</param>
 	public override void RotateAround(Vector2 center, float angle)
 	{
-		Matrix2D matrix = Matrix2D.Translate(center) * Matrix2D.Rotate(angle * Mathf.Deg2Rad) * Matrix2D.Translate(-center);
+		Matrix2D matrix = Matrix2D.Translate(center) * Matrix2D.RotateRH(angle * Mathf.Deg2Rad) * Matrix2D.Translate(-center);
 		position = matrix.MultiplyPoint(position);
 		majorAxis = matrix.MultiplyVector(majorAxis);
 
@@ -551,44 +561,11 @@ public class EllipseShape : VectorShape
 		return snap;
 	}
 
-	/// <summary>
-	/// Tessellate the shape into geometry data.
-	/// </summary>
-	protected override void GenerateGeometry()
+	protected BezierSegment[] GenerateSegments()
 	{
-		if ((shapeGeometry != null) && (!shapeDirty)) return;
-
+		int numCurves = 4; // Supposed to calculate from max error
 		float theta = Mathf.Atan2(MajorAxis.y, MajorAxis.x);
 
-		//Shape ellipse = new Shape();
-		//VectorUtils.MakeEllipseShape(ellipse, Vector2.zero, MajorAxis.magnitude, MinorAxis.magnitude);
-
-		//ellipse.PathProps = new PathProperties()
-		//{
-		//	Stroke = new Stroke()
-		//	{
-		//		Color = colorOutline,
-		//		HalfThickness = penSize / 2f * penToMeshScale
-		//	}
-		//};
-		//if (colorFill != Color.clear)
-		//{
-		//	ellipse.Fill = new SolidFill()
-		//	{
-		//		Color = colorFill
-		//	};
-		//}
-
-		//shapeNode = new SceneNode()
-		//{
-		//	Transform = matrixTransform * Matrix2D.Translate(position) * Matrix2D.Rotate(-theta),
-		//	Shapes = new List<Shape>
-		//	{
-		//		ellipse
-		//	}
-		//};
-
-		int numCurves = 4; // Supposed to calculate from max error
 		BezierSegment[] segments = new BezierSegment[numCurves];
 		float deltaAngle = sweepAngle / numCurves;
 		float sinTheta = Mathf.Sin(theta);
@@ -607,7 +584,7 @@ public class EllipseShape : VectorShape
 		float bCosAngleB = b * cosAngleB;
 		Vector2 ptB = new Vector2();
 		ptB.x = position.x + aCosAngleB * cosTheta - bSinAngleB * sinTheta;
-		ptB.y =position.y + aCosAngleB * sinTheta + bSinAngleB * cosTheta;
+		ptB.y = position.y + aCosAngleB * sinTheta + bSinAngleB * cosTheta;
 		Vector2 dotB = new Vector2();
 		dotB.x = -aSinAngleB * cosTheta - bCosAngleB * sinTheta;
 		dotB.y = -aSinAngleB * sinTheta + bCosAngleB * cosTheta;
@@ -637,7 +614,19 @@ public class EllipseShape : VectorShape
 			segments[i].P2.y = ptB.y - alpha * dotB.y;
 			segments[i].P3 = ptB;
 		}
+
+		return segments;
+	}
+
+	/// <summary>
+	/// Tessellate the shape into geometry data.
+	/// </summary>
+	protected override void GenerateGeometry()
+	{
+		if ((shapeGeometry != null) && (!shapeDirty)) return;
+
 		Shape ellipse = new Shape();
+
 		ellipse.PathProps = new PathProperties()
 		{
 			Stroke = new Stroke()
@@ -646,6 +635,16 @@ public class EllipseShape : VectorShape
 				HalfThickness = penSize / 2f * penToMeshScale
 			}
 		};
+		if (colorFill != Color.clear)
+		{
+			ellipse.Fill = new SolidFill()
+			{
+				Color = colorFill
+			};
+		}
+
+		BezierSegment[] segments = GenerateSegments();
+
 		ellipse.Contours = new BezierContour[1];
 		ellipse.Contours[0] = new BezierContour();
 		ellipse.Contours[0].Segments = VectorUtils.BezierSegmentsToPath(segments);
@@ -662,8 +661,25 @@ public class EllipseShape : VectorShape
 		tessellationScene.Root = shapeNode;
 		shapeGeometry = VectorUtils.TessellateScene(tessellationScene, tessellationOptions);
 
-		shapeMesh = null;
 		shapeDirty = false;
+	}
+
+	/// <summary>
+	/// Build a mesh for display with the VectorLineShader.
+	/// </summary>
+	protected override void GenerateLineMesh()
+	{
+		BezierSegment[] segments = GenerateSegments();
+
+		lineBuilder.BeginPolyLine(segments[0].P0);
+
+		for (int i = 0; i < segments.Length; i++)
+		{
+			BezierSegment segment = segments[i];
+			lineBuilder.CurveTo(segment.P1, segment.P2, segment.P3, 8);
+		}
+
+		lineBuilder.EndPolyLine(closed);
 	}
 
 	/// <summary>

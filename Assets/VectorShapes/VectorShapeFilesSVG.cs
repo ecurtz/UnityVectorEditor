@@ -286,7 +286,7 @@ public class VectorShapeFilesSVG
 		svgWriter.WriteStartAttribute("viewBox");
 		svgWriter.WriteValue(bounds.x);
 		svgWriter.WriteValue(" ");
-		svgWriter.WriteValue(bounds.y);
+		svgWriter.WriteValue(-(bounds.y + bounds.height));
 		svgWriter.WriteValue(" ");
 		svgWriter.WriteValue(bounds.width);
 		svgWriter.WriteValue(" ");
@@ -295,9 +295,28 @@ public class VectorShapeFilesSVG
 	}
 
 	/// <summary>
+	/// Open a new element tag in the xml.
+	/// </summary>
+	/// <param name="element">ID of element block to open</param>
+	public void OpenElement(string element)
+	{
+		svgWriter.WriteStartElement(element);
+	}
+
+	/// <summary>
+	/// Close an element tag in the xml.
+	/// </summary>
+	/// <param name="element">ID of element block to close (ignored)</param>
+	public void CloseElement(string element = null)
+	{
+		svgWriter.WriteEndElement();
+	}
+
+	/// <summary>
 	/// Add a list of shapes to SVG as a new group.
 	/// </summary>
 	/// <param name="shapes">List of shapes</param>
+	/// <param name="id">ID of group</param>
 	public void AddShapeGroup(List<VectorShape> shapes, string id)
 	{
 		svgWriter.WriteStartElement("g");
@@ -310,6 +329,24 @@ public class VectorShapeFilesSVG
 		{
 			shape.WriteToXML(svgWriter, Vector2.zero, 1f);
 		}
+
+		svgWriter.WriteEndElement();
+	}
+
+	/// <summary>
+	/// Add an element that reuses a defined object.
+	/// </summary>
+	public void AddUseElement(string id, Vector2 position, float rotation)
+	{
+		svgWriter.WriteStartElement("use");
+
+		svgWriter.WriteStartAttribute("xlink", "href", "http://www.w3.org/1999/xlink");
+		svgWriter.WriteValue("#" + id);
+		svgWriter.WriteEndAttribute();
+
+		svgWriter.WriteStartAttribute("transform");
+		svgWriter.WriteValue("translate(" + position.x + ", " + -position.y + ") rotate(" + -rotation + ")");
+		svgWriter.WriteEndAttribute();
 
 		svgWriter.WriteEndElement();
 	}

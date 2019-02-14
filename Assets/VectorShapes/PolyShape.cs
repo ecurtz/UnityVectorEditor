@@ -424,6 +424,30 @@ public class PolyShape : VectorShape
 	}
 
 	/// <summary>
+	/// Copy of the shape.
+	/// </summary>
+	/// <returns>New shape with properties of existing shape</returns>
+	public override VectorShape Duplicate()
+	{
+		PolyShape duplicate = Create();
+
+		int vertexCount = vertices.Length;
+		duplicate.vertices = new Vertex[vertexCount];
+		for (int i = 0; i < vertexCount; i++)
+		{
+			duplicate.vertices[i] = new Vertex();
+			duplicate.vertices[i].position = vertices[i].position;
+			duplicate.vertices[i].enterCP = vertices[i].enterCP;
+			duplicate.vertices[i].exitCP = vertices[i].exitCP;
+			duplicate.vertices[i].segmentCurves = vertices[i].segmentCurves;
+		}
+
+		duplicate.closed = closed;
+
+		return duplicate;
+	}
+
+	/// <summary>
 	/// Vertex index preceeding given index.
 	/// </summary>
 	int PreviousIndex(int i)
@@ -493,6 +517,66 @@ public class PolyShape : VectorShape
 		Dirty = true;
 	}
 
+	/// <summary>
+	/// Add a quadratic curve segment onto the shape.
+	/// </summary>
+	/// <param name="pt">New vertex position</param>
+	/// <param name="control">Control point position</param>
+	public void CurveTo(Vector2 pt, Vector2 control)
+	{
+		if (vertices.Length == 0)
+		{
+			Debug.LogWarning("CurveTo with no starting vertex.");
+			return;
+		}
+
+		if (closed)
+		{
+			Debug.LogWarning("Appending vertices to closed PolyShape.");
+		}
+
+		int index = vertices.Length;
+		int prev = PreviousIndex(index);
+		System.Array.Resize(ref vertices, vertices.Length + 1);
+		vertices[index] = new Vertex();
+		vertices[index].position = pt;
+		vertices[index - 1].segmentCurves = true;
+		vertices[index - 1].exitCP = control;
+		vertices[index].enterCP = control;
+
+		Dirty = true;
+	}
+
+	/// <summary>
+	/// Add a cubic curve segment onto the shape.
+	/// </summary>
+	/// <param name="pt">New vertex position</param>
+	/// <param name="controlA">Control point A position</param>
+	/// <param name="controlB">Control point B position</param>
+	public void CurveTo(Vector2 pt, Vector2 controlA, Vector2 controlB)
+	{
+		if (vertices.Length == 0)
+		{
+			Debug.LogWarning("CurveTo with no starting vertex.");
+			return;
+		}
+
+		if (closed)
+		{
+			Debug.LogWarning("Appending vertices to closed PolyShape.");
+		}
+
+		int index = vertices.Length;
+		int prev = PreviousIndex(index);
+		System.Array.Resize(ref vertices, vertices.Length + 1);
+		vertices[index] = new Vertex();
+		vertices[index].position = pt;
+		vertices[index - 1].segmentCurves = true;
+		vertices[index - 1].exitCP = controlA;
+		vertices[index].enterCP = controlB;
+
+		Dirty = true;
+	}
 
 	/// <summary>
 	/// Add a new circular arc onto the shape.
@@ -696,7 +780,7 @@ public class PolyShape : VectorShape
 	/// <param name="angle">Angle in degrees</param>
 	public override void RotateAround(Vector2 center, float angle)
 	{
-		Matrix2D matrix = Matrix2D.Translate(center) * Matrix2D.Rotate(angle * Mathf.Deg2Rad) * Matrix2D.Translate(-center);
+		Matrix2D matrix = Matrix2D.Translate(center) * Matrix2D.RotateRH(angle * Mathf.Deg2Rad) * Matrix2D.Translate(-center);
 		TransformBy(matrix);
 	}
 
@@ -913,6 +997,46 @@ public class PolyShape : VectorShape
 	}
 
 	/// <summary>
+	/// Build a mesh for display with the VectorLineShader.
+	/// </summary>
+	protected override void GenerateLineMesh()
+	{
+		Vertex vert = vertices[0];
+		Vertex vertPrevious;
+
+		lineBuilder.BeginPolyLine(vert.position);
+
+		for (int i = 1; i < vertices.Length; i++)
+		{
+			vertPrevious = vert;
+			vert = vertices[i];
+
+			if (vertPrevious.segmentCurves)
+			{
+				lineBuilder.CurveTo(vertPrevious.exitCP, vert.enterCP, vert.position, 8);
+			}
+			else
+			{
+				lineBuilder.LineTo(vert.position);
+			}
+		}
+
+		if (closed)
+		{
+			if (vert.segmentCurves)
+			{
+				lineBuilder.CurveTo(vert.exitCP, vertices[0].enterCP, vertices[0].position, 8);
+			}
+			else
+			{
+				lineBuilder.LineTo(vertices[0].position);
+			}
+		}
+
+		lineBuilder.EndPolyLine(closed);
+	}
+
+	/// <summary>
 	/// Build a 2D bounding box for the shape.
 	/// </summary>
 	protected override void GenerateBounds()
@@ -1041,7 +1165,7 @@ public class PolyShape : VectorShape
 		writer.WriteEndAttribute();
 
 		writer.WriteStartAttribute("stroke-width");
-		writer.WriteValue("0.01");
+		writer.WriteValue("1mm");
 		writer.WriteEndAttribute();
 
 		writer.WriteStartAttribute("fill");

@@ -6,7 +6,7 @@ using Unity.VectorGraphics;
 /// <summary>
 /// Base class of drawable vector based 2d elements.
 /// </summary>
-public abstract class VectorShape
+public abstract class VectorShape : System.IDisposable
 {
 	public class ShapeProxy : ScriptableObject, ISerializationCallbackReceiver
 	{
@@ -16,8 +16,8 @@ public abstract class VectorShape
 		[Range(0f, 25f)]
 		public float penSize;
 
-		public Color colorOutline;
-		public Color colorFill;
+		public Color32 colorOutline;
+		public Color32 colorFill;
 
 		public void OnBeforeSerialize()
 		{
@@ -93,7 +93,7 @@ public abstract class VectorShape
 	/// ID.
 	/// </summary>
 	[SerializeField]
-	protected string guid = System.Guid.NewGuid().ToString();
+	protected string guid = new ShortGuid().ToString();
 
 	/// <summary>
 	/// Transform matrix.
@@ -117,11 +117,17 @@ public abstract class VectorShape
 	protected Mesh shapeMesh = null;
 
 	/// <summary>
+	/// Line renderer mesh for shape outline.
+	/// </summary>
+	protected Mesh lineMesh = null;
+
+	/// <summary>
 	/// Bounds rectangle for shape (may be approximate for some shapes).
 	/// </summary>
 	protected Rect shapeBounds = Rect.zero;
 
 	protected bool shapeDirty = true;
+	protected bool lineDirty = true;
 	protected bool boundsDirty = true;
 
 	/// <summary>
@@ -167,6 +173,11 @@ public abstract class VectorShape
 	/// </summary>
 	public static VectorUtils.TessellationOptions tessellationOptions;
 
+	/// <summary>
+	/// Shared builder for making line meshes.
+	/// </summary>
+	public static VectorLineMeshBuilder lineBuilder;
+
 	static VectorShape()
 	{
 		tessellationScene = new Scene();
@@ -178,6 +189,38 @@ public abstract class VectorShape
 			MaxTanAngleDeviation = Mathf.PI / 16.0f,
 			SamplingStepSize = 0.05f
 		};
+
+		lineBuilder = new VectorLineMeshBuilder();
+	}
+
+	/// <summary>
+	/// Dispose of the shape mesh.
+	/// </summary>
+	public void Dispose()
+	{
+		if (shapeMesh != null)
+		{
+#if UNITY_EDITOR
+			UnityEngine.Object.DestroyImmediate(shapeMesh);
+#else
+			UnityEngine.Object.Destroy(shapeMesh);
+#endif
+		}
+
+		shapeDirty = true;
+		shapeMesh = null;
+
+		if (lineMesh != null)
+		{
+#if UNITY_EDITOR
+			UnityEngine.Object.DestroyImmediate(lineMesh);
+#else
+			UnityEngine.Object.Destroy(lineMesh);
+#endif
+		}
+
+		lineDirty = true;
+		lineMesh = null;
 	}
 
 	/// <summary>
@@ -189,10 +232,67 @@ public abstract class VectorShape
 		{
 			if ((shapeMesh == null) || shapeDirty)
 			{
-				GenerateMesh();
+				if (shapeMesh != null)
+				{
+#if UNITY_EDITOR
+					UnityEngine.Object.DestroyImmediate(shapeMesh);
+#else
+					UnityEngine.Object.Destroy(shapeMesh);
+#endif
+				}
+
+				GenerateGeometry();
+
+				shapeMesh = new Mesh();
+				if (shapeGeometry != null)
+				{
+					VectorUtils.FillMesh(shapeMesh, shapeGeometry, 1.0f);
+				}
+				shapeDirty = false;
 			}
 
 			return shapeMesh;
+		}
+	}
+
+	/// <summary>
+	/// Mesh of the shape outline for VectorLineShader.
+	/// </summary>
+	public Mesh LineMesh
+	{
+		get
+		{
+			if ((lineMesh == null) || lineDirty)
+			{
+				if (lineMesh != null)
+				{
+#if UNITY_EDITOR
+					UnityEngine.Object.DestroyImmediate(lineMesh);
+#else
+					UnityEngine.Object.Destroy(lineMesh);
+#endif
+				}
+
+				lineBuilder.Reset();
+
+				GenerateLineMesh();
+
+				lineMesh = lineBuilder.GetMesh();
+				lineDirty = false;
+			}
+
+			return lineMesh;
+		}
+	}
+
+	/// <summary>
+	/// Mesh of the filled shape (may be empty).
+	/// </summary>
+	public Mesh FillMesh
+	{
+		get
+		{
+			return null;
 		}
 	}
 
@@ -237,8 +337,8 @@ public abstract class VectorShape
 		{
 			if (value)
 			{
-				shapeMesh = null;
 				shapeDirty = true;
+				lineDirty = true;
 				boundsDirty = true;
 			}
 		}
@@ -277,6 +377,12 @@ public abstract class VectorShape
 			return guid;
 		}
 	}
+
+	/// <summary>
+	/// Copy of the shape.
+	/// </summary>
+	/// <returns>New shape with properties of existing shape</returns>
+	public abstract VectorShape Duplicate();
 
 	/// <summary>
 	/// Distance between a point and the shape.
@@ -325,20 +431,9 @@ public abstract class VectorShape
 	public abstract void TransformBy(Matrix2D matrix);
 
 	/// <summary>
-	/// Build the shape geometry into a mesh.
+	/// Build a mesh for display with the VectorLineShader.
 	/// </summary>
-	protected void GenerateMesh()
-	{
-		if ((shapeMesh != null) && (!shapeDirty)) return;
-
-		GenerateGeometry();
-
-		shapeMesh = new Mesh();
-		if (shapeGeometry != null)
-		{
-			VectorUtils.FillMesh(shapeMesh, shapeGeometry, 1.0f);
-		}
-	}
+	protected abstract void GenerateLineMesh();
 
 	/// <summary>
 	/// Distance between a point and the shape.

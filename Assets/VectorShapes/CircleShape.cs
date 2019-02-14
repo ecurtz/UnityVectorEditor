@@ -248,6 +248,15 @@ public class CircleShape : VectorShape
 	}
 
 	/// <summary>
+	/// Copy of the shape.
+	/// </summary>
+	/// <returns>New shape with properties of existing shape</returns>
+	public override VectorShape Duplicate()
+	{
+		return Create(position, radius, startAngle * Mathf.Rad2Deg, sweepAngle * Mathf.Rad2Deg);
+	}
+
+	/// <summary>
 	/// Distance between a point and the shape.
 	/// </summary>
 	/// <param name="pt">Test point</param>
@@ -298,7 +307,7 @@ public class CircleShape : VectorShape
 	/// <param name="angle">Angle in degrees</param>
 	public override void RotateAround(Vector2 center, float angle)
 	{
-		Matrix2D matrix = Matrix2D.Translate(center) * Matrix2D.Rotate(angle * Mathf.Deg2Rad) * Matrix2D.Translate(-center);
+		Matrix2D matrix = Matrix2D.Translate(center) * Matrix2D.RotateRH(angle * Mathf.Deg2Rad) * Matrix2D.Translate(-center);
 		position = matrix.MultiplyPoint(position);
 
 		Dirty = true;
@@ -474,8 +483,30 @@ public class CircleShape : VectorShape
 		tessellationScene.Root = shapeNode;
 		shapeGeometry = VectorUtils.TessellateScene(tessellationScene, tessellationOptions);
 
-		shapeMesh = null;
 		shapeDirty = false;
+	}
+
+	/// <summary>
+	/// Build a mesh for display with the VectorLineShader.
+	/// </summary>
+	protected override void GenerateLineMesh()
+	{
+		if (closed)
+		{
+			lineBuilder.Circle(position, radius, 32);
+		}
+		else
+		{
+			BezierPathSegment[] segments = VectorUtils.MakeArc(position, startAngle, sweepAngle, radius);
+
+			lineBuilder.BeginPolyLine(segments[0].P0);
+			int steps = Mathf.CeilToInt(16f * sweepAngle / Mathf.PI / segments.Length);
+			for (int i = 1; i < segments.Length; i++)
+			{
+				lineBuilder.CurveTo(segments[i - 1].P1, segments[i - 1].P2, segments[i].P0, steps);
+			}
+			lineBuilder.EndPolyLine();
+		}
 	}
 
 	/// <summary>
@@ -539,7 +570,7 @@ public class CircleShape : VectorShape
 		writer.WriteEndAttribute();
 
 		writer.WriteStartAttribute("stroke-width");
-		writer.WriteValue("0.01");
+		writer.WriteValue("1mm");
 		writer.WriteEndAttribute();
 
 		writer.WriteStartAttribute("fill");

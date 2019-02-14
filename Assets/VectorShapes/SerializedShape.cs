@@ -61,6 +61,20 @@ public class SerializedShape : ScriptableObject
 		if (texts == null) texts = new List<TextShape>();
 	}
 
+	public void SetShapes(List<VectorShape> shapes)
+	{
+		circles.Clear();
+		ellipses.Clear();
+		points.Clear();
+		polys.Clear();
+		texts.Clear();
+
+		foreach (VectorShape shape in shapes)
+		{
+			AddShape(shape);
+		}
+	}
+
 	public void AddShapes(List<VectorShape> shapes)
 	{
 		foreach (VectorShape shape in shapes)

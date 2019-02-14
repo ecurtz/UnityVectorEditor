@@ -81,6 +81,15 @@ public class PointShape : VectorShape
 	}
 
 	/// <summary>
+	/// Copy of the shape.
+	/// </summary>
+	/// <returns>New shape with properties of existing shape</returns>
+	public override VectorShape Duplicate()
+	{
+		return Create(position);
+	}
+
+	/// <summary>
 	/// Distance between a point and the shape.
 	/// </summary>
 	/// <param name="pt">Test point</param>
@@ -117,7 +126,7 @@ public class PointShape : VectorShape
 	/// <param name="angle">Angle in degrees</param>
 	public override void RotateAround(Vector2 center, float angle)
 	{
-		Matrix2D matrix = Matrix2D.Translate(center) * Matrix2D.Rotate(angle * Mathf.Deg2Rad) * Matrix2D.Translate(-center);
+		Matrix2D matrix = Matrix2D.Translate(center) * Matrix2D.RotateRH(angle * Mathf.Deg2Rad) * Matrix2D.Translate(-center);
 		position = matrix.MultiplyPoint(position);
 
 		Dirty = true;
@@ -225,16 +234,12 @@ public class PointShape : VectorShape
 			PathProps = pathProps
 		};
 
-		Shape circle = new Shape();
-		VectorUtils.MakeCircleShape(circle, position, pointRadius);
-		circle.PathProps = pathProps;
-
 		shapeNode = new SceneNode()
 		{
 			Transform = matrixTransform,
 			Shapes = new List<Shape>
 			{
-				segment1, segment2, circle
+				segment1, segment2
 			}
 		};
 
@@ -242,6 +247,20 @@ public class PointShape : VectorShape
 
 		shapeGeometry = VectorUtils.TessellateScene(tessellationScene, tessellationOptions);
 		shapeDirty = false;
+	}
+
+	/// <summary>
+	/// Build a mesh for display with the VectorLineShader.
+	/// </summary>
+	protected override void GenerateLineMesh()
+	{
+		lineBuilder.BeginPolyLine(new Vector2(position.x, position.y + pointRadius));
+		lineBuilder.LineTo(new Vector2(position.x, position.y - pointRadius));
+		lineBuilder.EndPolyLine();
+
+		lineBuilder.BeginPolyLine(new Vector2(position.x + pointRadius, position.y));
+		lineBuilder.LineTo(new Vector2(position.x - pointRadius, position.y));
+		lineBuilder.EndPolyLine();
 	}
 
 	/// <summary>

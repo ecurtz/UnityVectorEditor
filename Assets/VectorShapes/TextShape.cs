@@ -78,6 +78,15 @@ public class TextShape : VectorShape
 	}
 
 	/// <summary>
+	/// Copy of the shape.
+	/// </summary>
+	/// <returns>New shape with properties of existing shape</returns>
+	public override VectorShape Duplicate()
+	{
+		return Create(position, text);
+	}
+
+	/// <summary>
 	/// Distance between a point and the shape.
 	/// </summary>
 	/// <param name="pt">Test point</param>
@@ -114,7 +123,7 @@ public class TextShape : VectorShape
 	/// <param name="angle">Angle in degrees</param>
 	public override void RotateAround(Vector2 center, float angle)
 	{
-		Matrix2D matrix = Matrix2D.Translate(center) * Matrix2D.Rotate(angle * Mathf.Deg2Rad) * Matrix2D.Translate(-center);
+		Matrix2D matrix = Matrix2D.Translate(center) * Matrix2D.RotateRH(angle * Mathf.Deg2Rad) * Matrix2D.Translate(-center);
 		position = matrix.MultiplyPoint(position);
 
 		Dirty = true;
@@ -209,6 +218,13 @@ public class TextShape : VectorShape
 
 		shapeGeometry = VectorUtils.TessellateScene(tessellationScene, tessellationOptions);
 		shapeDirty = false;
+	}
+
+	/// <summary>
+	/// Build a mesh for display with the VectorLineShader.
+	/// </summary>
+	protected override void GenerateLineMesh()
+	{
 	}
 
 	/// <summary>

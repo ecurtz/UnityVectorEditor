@@ -37,6 +37,21 @@ public class CompoundShape : VectorShape
 	}
 
 	/// <summary>
+	/// Copy of the shape.
+	/// </summary>
+	/// <returns>New shape with properties of existing shape</returns>
+	public override VectorShape Duplicate()
+	{
+		CompoundShape duplicate = Create();
+		foreach (VectorShape component in components)
+		{
+			duplicate.AddComponent(component.Duplicate());
+		}
+
+		return duplicate;
+	}
+
+	/// <summary>
 	/// Add a component shape.
 	/// </summary>
 	public void AddComponent(VectorShape shape)
@@ -183,8 +198,18 @@ public class CompoundShape : VectorShape
 			shapeGeometry.AddRange(component.ShapeGeometry);
 		}
 
-		shapeMesh = null;
 		shapeDirty = false;
+	}
+
+	/// <summary>
+	/// Build a mesh for display with the VectorLineShader.
+	/// </summary>
+	protected override void GenerateLineMesh()
+	{
+		foreach (VectorShape component in _components)
+		{
+			shapeGeometry.AddRange(component.ShapeGeometry);
+		}
 	}
 
 	/// <summary>
@@ -201,7 +226,7 @@ public class CompoundShape : VectorShape
 			shapeBounds = _components[0].ShapeBounds;
 			for (int i = 1; i < _components.Count; i++)
 			{
-				shapeBounds = VectorShapeUtils.RectUnion(shapeBounds, _components[1].ShapeBounds);
+				shapeBounds = VectorShapeUtils.RectUnion(shapeBounds, _components[i].ShapeBounds);
 			}
 		}
 		boundsDirty = false;

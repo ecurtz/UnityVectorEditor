@@ -180,16 +180,16 @@ public class VectorShapeEditor : EditorWindow
 		{
 			toolIcons = new GUIContent[ToolSetCount];
 
-			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconView, renderUtil);
+			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconView);
 			toolIcons[(int)ToolSet.View] = new GUIContent(icon, "View Tool");
 
-			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconSelectionRect, renderUtil);
+			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconSelectionRect);
 			toolIcons[(int)ToolSet.Select] = new GUIContent(icon, "Selection Tool");
 
-			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconBrush, renderUtil);
+			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconBrush);
 			toolIcons[(int)ToolSet.Brush] = new GUIContent(icon, "Draw Tool");
 
-			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconShapes, renderUtil);
+			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconShapes);
 			toolIcons[(int)ToolSet.Shape] = new GUIContent(icon, "Shape Tool");
 		}
 
@@ -197,25 +197,25 @@ public class VectorShapeEditor : EditorWindow
 		{
 			shapeIcons = new GUIContent[ShapeSetCount];
 
-			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconPoint, renderUtil);
+			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconPoint);
 			shapeIcons[(int)ShapeSet.Point] = new GUIContent(icon, "Create Point");
 
-			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconCircle, renderUtil);
+			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconCircle);
 			shapeIcons[(int)ShapeSet.Circle] = new GUIContent(icon, "Create Circle");
 
-			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconTriangle, renderUtil);
+			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconTriangle);
 			shapeIcons[(int)ShapeSet.Triangle] = new GUIContent(icon, "Create Triangle");
 
-			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconSquare, renderUtil);
+			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconSquare);
 			shapeIcons[(int)ShapeSet.Rectangle] = new GUIContent(icon, "Create Rectangle");
 
-			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconPentagon, renderUtil);
+			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconPentagon);
 			shapeIcons[(int)ShapeSet.Pentagon] = new GUIContent(icon, "Create Pentagon");
 
-			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconHexagon, renderUtil);
+			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconHexagon);
 			shapeIcons[(int)ShapeSet.Hexagon] = new GUIContent(icon, "Create Hexagon");
 
-			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconPolygon, renderUtil);
+			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconPolygon);
 			shapeIcons[(int)ShapeSet.Polygon] = new GUIContent(icon, "Create Polygon");
 		}
 
@@ -223,31 +223,31 @@ public class VectorShapeEditor : EditorWindow
 		{
 			selectionIcons = new GUIContent[SelectionSetCount];
 
-			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconSelectObject, renderUtil);
+			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconSelectObject);
 			selectionIcons[(int)SelectionSet.Object] = new GUIContent(icon, "Select Shapes");
 
-			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconSelectSegment, renderUtil);
+			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconSelectSegment);
 			selectionIcons[(int)SelectionSet.Component] = new GUIContent(icon, "Select Segments");
 
-			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconSelectVertex, renderUtil);
+			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconSelectVertex);
 			selectionIcons[(int)SelectionSet.Vertex] = new GUIContent(icon, "Select Vertices");
 		}
 
 		if (iconMoreTools == null)
 		{
-			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconVerticalDots, renderUtil);
+			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconVerticalDots);
 			iconMoreTools = new GUIContent(icon, "More Tools");
 		}
 
 		if (iconShapeStroke == null)
 		{
-			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconCircle, renderUtil);
+			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconCircle);
 			iconShapeStroke = new GUIContent(icon, "Outline Color");
 		}
 
 		if (iconShapeFill == null)
 		{
-			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconFilledCircle, renderUtil);
+			icon = VectorShapeIcons.GetIcon(VectorShapeIcons.iconFilledCircle);
 			iconShapeFill = new GUIContent(icon, "Fill Color");
 		}
 	}
@@ -258,6 +258,7 @@ public class VectorShapeEditor : EditorWindow
 
 		if (editorWindow.OnCheckSave())
 		{
+			editorWindow.targetShape = shape;
 			editorWindow.titleContent.text = shape.name;
 			editorWindow.Shapes = shape.components;
 			editorWindow.Focus();
@@ -277,7 +278,7 @@ public class VectorShapeEditor : EditorWindow
 			}
 			else
 			{
-				bounds = Rect.zero;
+				bounds = new Rect(-50f, -50f, 100f, 100f);
 			}
 			foreach (VectorShape shape in shapes)
 			{
@@ -367,7 +368,13 @@ public class VectorShapeEditor : EditorWindow
 	{
 		bool accepted = true;
 
-		if (shapeDirty)
+		if (targetShape != null)
+		{
+			targetShape.SetShapes(shapes);
+			EditorUtility.SetDirty(targetShape);
+			AssetDatabase.SaveAssets();
+		}
+		else if (shapeDirty)
 		{
 			int option = EditorUtility.DisplayDialogComplex(
 				"Unsaved Changes",
@@ -397,15 +404,7 @@ public class VectorShapeEditor : EditorWindow
 
 	protected void SaveShape()
 	{
-		string path;
-		if (targetShape != null)
-		{
-			path = "";
-		}
-		else
-		{
-			path = EditorUtility.SaveFilePanelInProject("Save shape", "New Shape", "asset", "");
-		}
+		string path = EditorUtility.SaveFilePanelInProject("Save shape", "New Shape", "asset", "");
 	}
 
 	public void OnEnable()
@@ -432,17 +431,30 @@ public class VectorShapeEditor : EditorWindow
 			popup = null;
 		}
 
-		renderUtil.Cleanup();
+		if (renderUtil != null)
+		{
+			renderUtil.Cleanup();
+			renderUtil = null;
+		}
+
 		EditorApplication.modifierKeysChanged -= OnModifierKeys;
 	}
 
 	public void OnDestroy()
 	{
+		if (renderUtil != null)
+		{
+			renderUtil.Cleanup();
+			renderUtil = null;
+		}
+
 		if (popup != null)
 		{
-			DestroyImmediate(popup);
+			Object.DestroyImmediate(popup);
 			popup = null;
 		}
+
+		OnCheckSave();
 	}
 
 	public void OnModifierKeys()
@@ -485,6 +497,9 @@ public class VectorShapeEditor : EditorWindow
 			toolMenu.AddSeparator("");
 
 			toolMenu.AddItem(new GUIContent("Load SVG"), false, OnLoadSVG);
+#if DXF_SUPPORT
+			toolMenu.AddItem(new GUIContent("Load DXF"), false, OnLoadDXF);
+#endif
 
 			toolMenu.DropDown(buttonRect);
 		}
@@ -520,6 +535,22 @@ public class VectorShapeEditor : EditorWindow
 			}
 		}
 	}
+
+#if DXF_SUPPORT
+	protected void OnLoadDXF()
+	{
+		if (OnCheckSave())
+		{
+			string[] dxfExtensions = { "dxf", "DXF" };
+			string dxfPath = EditorUtility.OpenFilePanelWithFilters("Load DXF", "", dxfExtensions);
+			if (System.IO.File.Exists(dxfPath))
+			{
+				System.IO.FileStream stream = System.IO.File.OpenRead(dxfPath);
+				Shapes = VectorShapeFilesDXF.ReadDXF(stream);
+			}
+		}
+	}
+#endif
 
 	const float penLabelWidth = 26f;
 	const float penSizeWidth = 50f;
@@ -745,6 +776,7 @@ public class VectorShapeEditor : EditorWindow
 			}
 		}
 
+		UpdateMouseToShape();
 		Rect toolRect = new Rect(0, 0, this.position.width, toolAreaHeight);
 
 		Rect toolbarRect = new Rect(toolbarPadding * 2, toolbarPadding, toolbarWidth * (toolIcons.Length + 1) + toolbarPadding, toolbarHeight);
@@ -1032,6 +1064,7 @@ public class VectorShapeEditor : EditorWindow
 			if (activeLine == null)
 			{
 				PolyShape newLine = PolyShape.Create(new Vector2[] { shapePosition });
+				newLine.penToMeshScale = mouseToShapeScale;
 				newLine.colorOutline = shapeOutlineColor;
 				newLine.colorFill = shapeFillColor;
 				SetFocusedShape(newLine);
@@ -1123,6 +1156,7 @@ public class VectorShapeEditor : EditorWindow
 			Vector2 shapePosition = MouseToShapePoint(mousePosition);
 
 			PointShape newPoint = PointShape.Create(shapePosition);
+			newPoint.penToMeshScale = mouseToShapeScale;
 			newPoint.colorOutline = shapeOutlineColor;
 			newPoint.colorFill = shapeFillColor;
 			SetFocusedShape(newPoint);
@@ -1138,6 +1172,7 @@ public class VectorShapeEditor : EditorWindow
 		if (guiEvent.type == EventType.MouseDown)
 		{
 			CircleShape newCircle = CircleShape.Create(shapePosition, 0f);
+			newCircle.penToMeshScale = mouseToShapeScale;
 			newCircle.colorOutline = shapeOutlineColor;
 			newCircle.colorFill = shapeFillColor;
 			SetFocusedShape(newCircle);
@@ -1165,6 +1200,7 @@ public class VectorShapeEditor : EditorWindow
 		if (guiEvent.type == EventType.MouseDown)
 		{
 			PolyShape newPoly = PolyShape.Create(shapePosition, minPolyRadius, sides);
+			newPoly.penToMeshScale = mouseToShapeScale;
 			newPoly.colorOutline = shapeOutlineColor;
 			newPoly.colorFill = shapeFillColor;
 			SetFocusedShape(newPoly);
@@ -1198,6 +1234,7 @@ public class VectorShapeEditor : EditorWindow
 		if (guiEvent.type == EventType.MouseDown)
 		{
 			PolyShape newRect = PolyShape.Create(shapePosition, 0f, 4);
+			newRect.penToMeshScale = mouseToShapeScale;
 			newRect.colorOutline = shapeOutlineColor;
 			newRect.colorFill = shapeFillColor;
 			SetFocusedShape(newRect);
@@ -1231,6 +1268,7 @@ public class VectorShapeEditor : EditorWindow
 				points[0] = shapePosition;
 
 				PolyShape newPoly = PolyShape.Create(points);
+				newPoly.penToMeshScale = mouseToShapeScale;
 				SetFocusedShape(newPoly);
 			}
 			else
