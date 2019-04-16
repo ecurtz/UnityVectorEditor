@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+[CreateAssetMenu(fileName = "Shape", menuName = "Testing/Shape")]
 [System.Serializable]
 public class SerializedShape : ScriptableObject
 {

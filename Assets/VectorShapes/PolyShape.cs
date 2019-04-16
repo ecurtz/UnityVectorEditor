@@ -1041,6 +1041,8 @@ public class PolyShape : VectorShape
 	/// </summary>
 	protected override void GenerateBounds()
 	{
+	// TO DO
+	// http://www.iquilezles.org/www/articles/bezierbbox/bezierbbox.htm
 		int bezierSteps = VectorShapeUtils.bezierSteps;
 		List<Vector2> pointList = new List<Vector2>();
 		float step = 1f / bezierSteps;

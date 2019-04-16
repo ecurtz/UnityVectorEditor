@@ -26,11 +26,16 @@ public class SerializedShapeDrawer : PropertyDrawer
 		// prefab override logic works on the entire property.
 		EditorGUI.BeginProperty(position, label, property);
 
+		// Bail if the ScriptableObject hasn't been initialized
+		if (property.objectReferenceValue == null)
+		{
+			EditorGUI.PropertyField(position, property);
+			return;
+		}
+
 		// Draw label
 		position = EditorGUI.PrefixLabel(position, GUIUtility.GetControlID(FocusType.Passive), label);
 
-		// Bail if the ScriptableObject hasn't been initialized
-		if (property.objectReferenceValue == null) return;
 		SerializedObject propertyObject = new SerializedObject(property.objectReferenceValue);
 
 		// Don't make child fields be indented
@@ -121,6 +126,11 @@ public class SerializedShapeDrawer : PropertyDrawer
 
 	public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
 	{
+		if (property.objectReferenceValue == null)
+		{
+			return EditorGUIUtility.singleLineHeight;
+		}
+
 		return EditorGUIUtility.singleLineHeight + padding;
 	}
 }

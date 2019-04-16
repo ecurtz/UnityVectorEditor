@@ -58,7 +58,8 @@ Shader "Unlit/VectorLineShader"
             v2f vert (appdata v)
             {
                 v2f o;
-                float3 normal = float3(v.normal.zw, 0.0);
+                // UnityObjectToWorldDir without the normalize
+                float3 normal = mul((float3x3)unity_ObjectToWorld, float3(v.normal.zw, 0.0));
                 float3 pos = UnityObjectToViewPos(v.vertex);
                 float3 delta = normal * _LineWidth * _PixelScale;
                 o.vertex = UnityViewToClipPos(pos + delta);

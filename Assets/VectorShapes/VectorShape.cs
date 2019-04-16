@@ -93,7 +93,7 @@ public abstract class VectorShape : System.IDisposable
 	/// ID.
 	/// </summary>
 	[SerializeField]
-	protected string guid = new ShortGuid().ToString();
+	protected string guid = new System.Guid().ToString();
 
 	/// <summary>
 	/// Transform matrix.

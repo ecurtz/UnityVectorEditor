@@ -1,0 +1,85 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c081e07c8a64f48c98e1c02e172f84f0, type: 3}
+  m_Name: SampleShape
+  m_EditorClassIdentifier: 
+  circles:
+  - penSize: 2
+    penToMeshScale: 0.23741485
+    colorOutline: {r: 0, g: 0, b: 0, a: 1}
+    colorFill: {r: 0.32156864, g: 0.8, b: 0.2627451, a: 1}
+    closed: 1
+    guid: 00000000-0000-0000-0000-000000000000
+    position: {x: 14.267512, y: -14.140124}
+    radius: 22.272238
+    startAngle: 0
+    sweepAngle: 0
+  ellipses: []
+  points: []
+  polys:
+  - penSize: 2
+    penToMeshScale: 0.23741485
+    colorOutline: {r: 0, g: 0, b: 0, a: 1}
+    colorFill: {r: 0, g: 0, b: 0, a: 0}
+    closed: 1
+    guid: 00000000-0000-0000-0000-000000000000
+    vertices:
+    - position: {x: -20.891724, y: 56.17943}
+      enterCP: {x: -20.896053, y: 26.119652}
+      exitCP: {x: -20.887394, y: 26.119652}
+      segmentCurves: 0
+    - position: {x: 5.1430874, y: 11.078723}
+      enterCP: {x: -20.88523, y: 26.115902}
+      exitCP: {x: -20.889559, y: 26.108402}
+      segmentCurves: 0
+    - position: {x: -46.926537, y: 11.078723}
+      enterCP: {x: -20.893888, y: 26.108402}
+      exitCP: {x: -20.898218, y: 26.115902}
+      segmentCurves: 0
+    continuousCurves: 1
+    activeIndex: -1
+    activeComponent: 0
+  - penSize: 2
+    penToMeshScale: 0.23741485
+    colorOutline: {r: 0.8784314, g: 0.5294118, b: 0.078431375, a: 1}
+    colorFill: {r: 0, g: 0, b: 0, a: 0}
+    closed: 1
+    guid: 00000000-0000-0000-0000-000000000000
+    vertices:
+    - position: {x: -34.904465, y: 20.632269}
+      enterCP: {x: -34.906963, y: -1.9058251}
+      exitCP: {x: -34.901966, y: -1.9058251}
+      segmentCurves: 0
+    - position: {x: -15.382214, y: 9.3618355}
+      enterCP: {x: -34.901386, y: -1.9061601}
+      exitCP: {x: -34.898884, y: -1.9104902}
+      segmentCurves: 0
+    - position: {x: -15.38221, y: -13.183476}
+      enterCP: {x: -34.898884, y: -1.9111601}
+      exitCP: {x: -34.901386, y: -1.9154902}
+      segmentCurves: 0
+    - position: {x: -34.904465, y: -24.45392}
+      enterCP: {x: -34.901966, y: -1.9158251}
+      exitCP: {x: -34.906963, y: -1.9158251}
+      segmentCurves: 0
+    - position: {x: -54.42672, y: -13.183476}
+      enterCP: {x: -34.907543, y: -1.9154902}
+      exitCP: {x: -34.910046, y: -1.9111601}
+      segmentCurves: 0
+    - position: {x: -54.426716, y: 9.3618355}
+      enterCP: {x: -34.910046, y: -1.9104902}
+      exitCP: {x: -34.907543, y: -1.9061601}
+      segmentCurves: 0
+    continuousCurves: 1
+    activeIndex: -1
+    activeComponent: 0
+  texts: []
